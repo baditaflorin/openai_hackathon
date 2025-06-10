@@ -6,13 +6,16 @@
   <title>Podcast Pipeline</title>
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
 </head>
 <body>
-  <div class="container py-4">
-    <div class="d-flex align-items-center mb-4">
-      <h1 class="me-auto">Podcast Pipeline</h1>
-      <a href="/scheduler" class="btn btn-outline-secondary">Scheduler</a>
+  <nav class="navbar navbar-light bg-white shadow-sm sticky-top mb-4">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/">Podcast Pipeline</a>
+      <a href="/scheduler" class="btn btn-outline-primary">Scheduler</a>
     </div>
+  </nav>
+  <div class="container pb-4">
 
     <div id="drop_zone" class="border border-secondary rounded p-4 text-center mb-4" style="border-style: dashed;">
       <p class="mb-2">Drop video or audio file here</p>
