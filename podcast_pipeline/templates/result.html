@@ -17,13 +17,19 @@
     </div>
 
     <div class="mb-4">
-      <h2>Script</h2>
-      <pre class="bg-light p-3 border rounded">{{ script }}</pre>
+      <h2>Short Description</h2>
+      <p class="bg-light p-3 border rounded">{{ short_description }}</p>
     </div>
 
     <div class="mb-4">
-      <h2>Distribution</h2>
-      <pre class="bg-light p-3 border rounded">{{ distribution }}</pre>
+      <h2>Long Description</h2>
+      <p class="bg-light p-3 border rounded">{{ long_description }}</p>
+    </div>
+
+    <div class="mb-4">
+      <h2>Entities</h2>
+      <p><strong>People:</strong> {{ people|join(', ') }}</p>
+      <p><strong>Locations:</strong> {{ locations|join(', ') }}</p>
     </div>
 
     <a href="/record/{{ id }}" class="btn btn-primary me-2">View Details</a>

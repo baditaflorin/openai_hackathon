@@ -31,13 +31,19 @@
     </div>
 
     <div class="mb-4">
-      <h2>Script</h2>
-      <pre class="bg-light p-3 border rounded">{{ record.script }}</pre>
+      <h2>Short Description</h2>
+      <p class="bg-light p-3 border rounded">{{ record.short_description }}</p>
     </div>
 
     <div class="mb-4">
-      <h2>Distribution</h2>
-      <pre class="bg-light p-3 border rounded">{{ record.distribution }}</pre>
+      <h2>Long Description</h2>
+      <p class="bg-light p-3 border rounded">{{ record.long_description }}</p>
+    </div>
+
+    <div class="mb-4">
+      <h2>Entities</h2>
+      <p><strong>People:</strong> {{ record.people|join(', ') }}</p>
+      <p><strong>Locations:</strong> {{ record.locations|join(', ') }}</p>
     </div>
 
     <a href="/" class="btn btn-secondary">Back to home</a>

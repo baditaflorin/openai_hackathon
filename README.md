@@ -109,7 +109,7 @@ python -m podcast_pipeline.gui
 
 ### Web Application
 
-You can also run a FastAPI-based web interface for drag-and-drop file upload and processing. The home page now lists all previously processed files—click any file to view its detailed transcript, script, and distribution.
+You can also run a FastAPI-based web interface for drag-and-drop file upload and processing. The home page now displays all previously processed files as responsive cards—click any card to view its detailed transcript, short & long descriptions, and extracted entities.
 
 ```bash
 pip install -r requirements.txt
@@ -118,11 +118,12 @@ uvicorn podcast_pipeline.web:app --reload
 
 Then visit `http://127.0.0.1:8000/` in your browser.
 
-You can either drag-and-drop your audio file or click the "Or select file" button in the web UI to upload.
-
-- A loading spinner overlay will appear while your file is being uploaded and processed, giving you visual feedback.
-- Processed files will appear in a list below the upload zone; click a filename to view its details.
+- You can drag-and-drop or select a **video or audio file** in the web UI to upload.
+- An inline progress bar and spinner will indicate upload progress and processing status without blocking the rest of the UI.
+- Processed files will appear as a responsive grid of cards below the upload zone; click any card to view its details.
+- If your audio file exceeds OpenAI Whisper's 25MB upload limit, it will be automatically split into smaller segments and transcribed sequentially, then combined into a single transcript.
 - On the episode detail page, you'll see 5 suggested titles—choose one as your favorite and save it for later use.
+- Each record’s detail page now shows a **short description** and a **long description** generated from the transcript, along with any referenced **people** and **locations** automatically extracted.
 - You can also delete old records (and their audio files) directly from the home page using the "Delete" button next to each processed file.
 
 ### Scheduler

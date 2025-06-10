@@ -47,6 +47,7 @@ pre {
 /* Loading overlay with CSS spinner */
 #loading {
   position: fixed;
+  pointer-events: none;
   top: 0;
   left: 0;
   width: 100vw;

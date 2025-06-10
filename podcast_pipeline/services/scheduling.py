@@ -49,7 +49,7 @@ async def propose_schedule_async(
                 "cadence": cadence,
                 "n_days": n_days,
                 "episodes": [
-                    {"id": rec["id"], "title": rec.get("selected_title"), "description": rec.get("script")}
+                    {"id": rec["id"], "title": rec.get("selected_title"), "description": rec.get("long_description")}
                     for rec in records
                 ],
             }

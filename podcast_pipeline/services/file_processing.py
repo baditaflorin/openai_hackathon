@@ -2,6 +2,8 @@ from uuid import uuid4
 from datetime import datetime
 
 from ..steps.transcription import transcribe_audio
+from ..steps.description_generation import generate_descriptions_async
+from ..steps.entity_extraction import extract_entities_async
 from ..steps.title_suggestion import propose_titles_async
 from ..steps.script_generation import generate_script_async
 from ..steps.audio_editing import edit_audio_async
@@ -13,6 +15,9 @@ async def process_file_async(file_path: str, filename: str) -> dict:
     editing, and distribution. Returns a metadata record dictionary.
     """
     transcript = transcribe_audio(file_path)
+    # generate descriptions and entities from transcript
+    desc = await generate_descriptions_async(transcript)
+    entities = await extract_entities_async(transcript)
     titles = await propose_titles_async(transcript)
     script = await generate_script_async(transcript)
     edited_audio = await edit_audio_async(file_path)
@@ -25,6 +30,10 @@ async def process_file_async(file_path: str, filename: str) -> dict:
         "transcript": transcript,
         "titles": titles,
         "selected_title": None,
+        "short_description": desc.get("short_description", ""),
+        "long_description": desc.get("long_description", ""),
+        "people": entities.get("people", []),
+        "locations": entities.get("locations", []),
         "script": script,
         "edited_audio": edited_audio,
         "distribution": distribution,

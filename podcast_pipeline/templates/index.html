@@ -15,34 +15,44 @@
     </div>
 
     <div id="drop_zone" class="border border-secondary rounded p-4 text-center mb-4" style="border-style: dashed;">
-      <p class="mb-2">Drop audio file here</p>
-      <button id="file_select_btn" class="btn btn-primary">Select a file</button>
+      <p class="mb-2">Drop video or audio file here</p>
+      <button id="file_select_btn" class="btn btn-primary">Select a video or audio file</button>
       <input type="file" id="file_input" style="display: none;">
     </div>
 
     {% if records %}
     <div class="mb-5">
       <h2>Processed Files</h2>
-      <ul id="records_list" class="list-group">
+      <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
         {% for rec in records %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <a href="/record/{{ rec.id }}">{{ rec.filename }}</a>
-            <small class="text-muted ms-2">{{ rec.upload_time }}</small>
+        <div class="col">
+          <div class="card h-100">
+            <div class="card-body d-flex flex-column">
+              <h5 class="card-title">{{ rec.filename }}</h5>
+              <p class="card-text text-muted">{{ rec.upload_time }}</p>
+              <div class="mt-auto">
+                <a href="/record/{{ rec.id }}" class="btn btn-primary btn-sm me-2">Details</a>
+                <form method="post" action="/record/{{ rec.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this record and file?');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </div>
+            </div>
           </div>
-          <form method="post" action="/record/{{ rec.id }}/delete" onsubmit="return confirm('Delete this record and file?');">
-            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-          </form>
-        </li>
+        </div>
         {% endfor %}
-      </ul>
+      </div>
     </div>
     {% endif %}
 
     <!-- Loading overlay shown while processing upload -->
-  <div id="loading" class="position-fixed w-100 h-100 top-0 start-0 d-none bg-white bg-opacity-75 justify-content-center align-items-center">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
+    <div id="loading" class="position-fixed w-100 h-100 top-0 start-0 d-none bg-white bg-opacity-75 justify-content-center align-items-center">
+      <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <div id="progress_container" class="progress w-50 mt-3 d-none">
+          <div id="progress_bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+        </div>
       </div>
     </div>
   </div>
