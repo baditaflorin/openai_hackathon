@@ -3,10 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileInput = document.getElementById('file_input');
   const fileSelectBtn = document.getElementById('file_select_btn');
 
-  const loadingOverlay = document.getElementById('loading');
-  const progressContainer = document.getElementById('progress_container');
-  const progressBar = document.getElementById('progress_bar');
-  const progressLabel = document.getElementById('progress_label');
+  const recordsContainer = document.getElementById('records_container');
 
   const recordControls = document.getElementById('record_controls');
   const recordScreenBtn = document.getElementById('record_screen_btn');
@@ -14,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const recordBothBtn = document.getElementById('record_both_btn');
   let mediaRecorder;
   let mediaChunks = [];
-  // Define stages for client-side progress bar
   const STAGE_INFO = {
     uploading:   { label: 'Uploading file...',       percent: 10 },
     transcribing:{ label: 'Transcribing audio...',    percent: 20 },
@@ -27,76 +23,102 @@ document.addEventListener('DOMContentLoaded', () => {
     complete:    { label: 'Finalizing...',            percent:100 },
   };
 
-  /**
-   * Update the progress bar and status label.
-   */
-  const updateBar = (percent, text) => {
-    progressBar.style.width = percent + '%';
-    progressBar.textContent = percent + '%';
-    progressLabel.textContent = text;
-  };
+  function createJobCard(initialId, fileName) {
+    const col = document.createElement('div');
+    col.className = 'col';
+    col.id = `rec_${initialId}`;
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    const body = document.createElement('div');
+    body.className = 'card-body d-flex flex-column';
+    const title = document.createElement('h5');
+    title.className = 'card-title';
+    title.textContent = fileName;
+    const time = document.createElement('p');
+    time.className = 'card-text text-muted mb-1';
+    time.textContent = new Date().toLocaleString();
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-info mb-2';
+    badge.textContent = `${STAGE_INFO.uploading.label} (0%)`;
+    const progDiv = document.createElement('div');
+    progDiv.className = 'progress mb-2';
+    const progBar = document.createElement('div');
+    progBar.className = 'progress-bar';
+    progBar.setAttribute('role', 'progressbar');
+    progBar.style.width = '0%';
+    progBar.textContent = '0%';
+    progDiv.appendChild(progBar);
+    body.append(title, time, badge, progDiv);
+    card.appendChild(body);
+    col.appendChild(card);
+    recordsContainer.prepend(col);
+    return { badge, progBar, cardBody: body, col };
+  }
 
   const handleFile = (file) => {
-    loadingOverlay.classList.remove('d-none');
-    loadingOverlay.classList.add('d-flex');
-    progressContainer.classList.remove('d-none');
-    progressLabel.classList.remove('d-none');
-    // start with 0
-    updateBar(0, 'Starting...');
-
     const formData = new FormData();
     formData.append('file', file);
+    const placeholderId = Date.now().toString();
+    const { badge, progBar, cardBody, col } = createJobCard(placeholderId, file.name);
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/upload');
-    // track upload progress up to STAGE_INFO.uploading.percent
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable) {
         const pct = Math.round((e.loaded / e.total) * STAGE_INFO.uploading.percent);
-        updateBar(pct, STAGE_INFO.uploading.label);
+        badge.textContent = `${STAGE_INFO.uploading.label} (${pct}%)`;
+        progBar.style.width = pct + '%';
+        progBar.textContent = pct + '%';
       }
     });
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        let resp;
-        try {
-          resp = JSON.parse(xhr.responseText);
-        } catch (_e) { resp = {}; }
+        const resp = JSON.parse(xhr.responseText || '{}');
         const jobId = resp.id;
-        // after upload, move to first server stage
-        updateBar(STAGE_INFO.transcribing.percent, STAGE_INFO.transcribing.label);
-        // poll backend for progress updates
+        col.id = `rec_${jobId}`;
+        badge.textContent = STAGE_INFO.transcribing.label + ` (0%)`;
+        progBar.style.width = STAGE_INFO.transcribing.percent + '%';
+        progBar.textContent = STAGE_INFO.transcribing.percent + '%';
         const poll = setInterval(async () => {
           try {
             const r = await fetch(`/progress/${jobId}`);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const stat = await r.json();
-            if (STAGE_INFO[stat.stage]) {
-              updateBar(STAGE_INFO[stat.stage].percent, STAGE_INFO[stat.stage].label);
+            if (stat.stage === 'error') {
+              clearInterval(poll);
+              badge.className = 'badge bg-danger mb-2';
+              badge.textContent = `Error: ${stat.message || 'processing failed'}`;
+              return;
+            }
+            const info = STAGE_INFO[stat.stage];
+            if (info) {
+              badge.textContent = `${info.label} (${stat.progress}%)`;
+              progBar.style.width = stat.progress + '%';
+              progBar.textContent = stat.progress + '%';
             }
             if (stat.progress >= 100) {
               clearInterval(poll);
-              // navigate to record detail
-              window.location = `/record/${jobId}`;
+              badge.className = 'badge bg-success mb-2';
+              badge.textContent = 'Completed';
+              const link = document.createElement('a');
+              link.href = `/record/${jobId}`;
+              link.className = 'btn btn-primary btn-sm me-2';
+              link.textContent = 'Details';
+              cardBody.appendChild(link);
             }
           } catch (err) {
-            console.error('Progress poll error', err);
+            clearInterval(poll);
+            badge.className = 'badge bg-danger mb-2';
+            badge.textContent = `Error: ${err.message}`;
           }
         }, 1000);
       } else {
-        console.error('Upload failed', xhr.status);
-        loadingOverlay.classList.remove('d-flex');
-        loadingOverlay.classList.add('d-none');
-        progressContainer.classList.add('d-none');
-        progressLabel.classList.add('d-none');
-        alert(`Upload failed with status ${xhr.status}`);
+        badge.className = 'badge bg-danger mb-2';
+        badge.textContent = `Upload failed (${xhr.status})`;
       }
     };
     xhr.onerror = () => {
-      console.error('Upload error', xhr);
-      loadingOverlay.classList.remove('d-flex');
-      loadingOverlay.classList.add('d-none');
-      progressContainer.classList.add('d-none');
-      progressLabel.classList.add('d-none');
-      alert('Upload error');
+      badge.className = 'badge bg-danger mb-2';
+      badge.textContent = 'Upload error';
     };
     xhr.send(formData);
   };
@@ -104,8 +126,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const startRecording = async (captureScreen, captureWebcam) => {
     const streams = [];
     if (captureScreen) {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: captureWebcam });
       streams.push(screenStream);
+      if (!captureWebcam) {
+        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streams.push(micStream);
+      }
     }
     if (captureWebcam) {
       const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });

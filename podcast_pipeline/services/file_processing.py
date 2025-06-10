@@ -26,46 +26,58 @@ async def process_file_async(
     # determine or generate the record ID for status tracking
     rec_id = record_id or str(uuid4())
 
-    # transcription stage
-    update_progress(rec_id, "transcribing")
-    transcript = await asyncio.to_thread(transcribe_audio, file_path)
+    try:
+        # transcription stage
+        update_progress(rec_id, "transcribing")
+        transcript = await asyncio.to_thread(transcribe_audio, file_path)
 
-    # description and entity extraction stage
-    update_progress(rec_id, "descriptions")
-    desc = await generate_descriptions_async(transcript)
-    update_progress(rec_id, "entities")
-    entities = await extract_entities_async(transcript)
+        # description and entity extraction stage
+        update_progress(rec_id, "descriptions")
+        desc = await generate_descriptions_async(transcript)
+        update_progress(rec_id, "entities")
+        entities = await extract_entities_async(transcript)
 
-    # title suggestion and script generation stage
-    update_progress(rec_id, "titles")
-    titles = await propose_titles_async(transcript)
-    update_progress(rec_id, "script")
-    script = await generate_script_async(transcript)
+        # title suggestion and script generation stage
+        update_progress(rec_id, "titles")
+        titles = await propose_titles_async(transcript)
+        update_progress(rec_id, "script")
+        script = await generate_script_async(transcript)
 
-    # audio editing and distribution stage
-    update_progress(rec_id, "editing")
-    edited_audio = await edit_audio_async(file_path)
-    update_progress(rec_id, "distribution")
-    distribution = await distribute_async(edited_audio)
+        # audio editing and distribution stage
+        update_progress(rec_id, "editing")
+        edited_audio = await edit_audio_async(file_path)
+        update_progress(rec_id, "distribution")
+        distribution = await distribute_async(edited_audio)
 
-    # finalize and save metadata
-    record = {
-        "id": rec_id,
-        "filename": filename,
-        "upload_time": datetime.utcnow().isoformat(),
-        "transcript": transcript,
-        "titles": titles,
-        "selected_title": None,
-        "short_description": desc.get("short_description", ""),
-        "long_description": desc.get("long_description", ""),
-        "people": entities.get("people", []),
-        "locations": entities.get("locations", []),
-        "script": script,
-        "edited_audio": edited_audio,
-        "distribution": distribution,
-    }
-    append_metadata(record)
+        # finalize and save metadata
+        record = {
+            "id": rec_id,
+            "filename": filename,
+            "upload_time": datetime.utcnow().isoformat(),
+            "transcript": transcript,
+            "titles": titles,
+            "selected_title": None,
+            "short_description": desc.get("short_description", ""),
+            "long_description": desc.get("long_description", ""),
+            "people": entities.get("people", []),
+            "locations": entities.get("locations", []),
+            "script": script,
+            "edited_audio": edited_audio,
+            "distribution": distribution,
+        }
+        append_metadata(record)
 
-    # complete
-    update_progress(rec_id, "complete")
-    return record
+        # complete
+        update_progress(rec_id, "complete")
+        return record
+    except Exception as exc:
+        err_msg = str(exc)
+        update_progress(rec_id, "error", err_msg)
+        record = {
+            "id": rec_id,
+            "filename": filename,
+            "upload_time": datetime.utcnow().isoformat(),
+            "error": err_msg,
+        }
+        append_metadata(record)
+        return record

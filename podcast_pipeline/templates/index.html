@@ -26,18 +26,29 @@
       <button id="record_both_btn" class="btn btn-success">Record Screen + Webcam</button>
     </div>
 
-    {% if records %}
     <div class="mb-5">
-      <h2>Processed Files</h2>
-      <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
+      <h2>Episode Dashboard</h2>
+      <div id="records_container" class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
         {% for rec in records %}
-        <div class="col">
+        <div class="col" id="rec_{{ rec.id }}">
           <div class="card h-100">
             <div class="card-body d-flex flex-column">
-              <h5 class="card-title">{{ rec.filename }}</h5>
-              <p class="card-text text-muted">{{ rec.upload_time }}</p>
+              <h5 class="card-title">{{ rec.selected_title or rec.filename }}</h5>
+              <p class="card-text text-muted mb-1">{{ rec.upload_time }}</p>
+              {% if rec.progress < 100 %}
+                {% if rec.stage == 'error' %}
+                  <span class="badge bg-danger mb-2">Error: {{ rec.message or rec.error }}</span>
+                {% else %}
+                  <span class="badge bg-info mb-2">{{ rec.stage.replace('_', ' ').capitalize() }} ({{ rec.progress }}%)</span>
+                  <div class="progress mb-2">
+                    <div class="progress-bar" role="progressbar" style="width: {{ rec.progress }}%;" aria-valuenow="{{ rec.progress }}" aria-valuemin="0" aria-valuemax="100">{{ rec.progress }}%</div>
+                  </div>
+                {% endif %}
+              {% endif %}
               <div class="mt-auto">
-                <a href="/record/{{ rec.id }}" class="btn btn-primary btn-sm me-2">Details</a>
+                {% if rec.progress >= 100 and not rec.error %}
+                  <a href="/record/{{ rec.id }}" class="btn btn-primary btn-sm me-2">Details</a>
+                {% endif %}
                 <form method="post" action="/record/{{ rec.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this record and file?');">
                   <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                 </form>
@@ -48,20 +59,7 @@
         {% endfor %}
       </div>
     </div>
-    {% endif %}
 
-    <!-- Loading overlay shown while processing upload -->
-    <div id="loading" class="position-fixed w-100 h-100 top-0 start-0 d-none bg-white bg-opacity-75 justify-content-center align-items-center">
-      <div class="text-center">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-        <div id="progress_container" class="progress w-50 mt-3 d-none">
-          <div id="progress_bar" class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
-        </div>
-        <div id="progress_label" class="mt-2 text-center d-none"></div>
-      </div>
-    </div>
   </div>
 
   <!-- Bootstrap JS and application script -->

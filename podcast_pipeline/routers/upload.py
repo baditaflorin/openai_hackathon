@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from ..utils.file_io import save_upload_file
 from ..services.file_processing import process_file_async
 from ..utils.metadata import read_metadata
-from ..utils.progress import update_progress, read_progress
+from ..utils.progress import update_progress, read_progress, enrich_with_progress
 from ..config import TEMPLATES
 from uuid import uuid4
 
@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve the upload form and list of processed files."""
-    records = read_metadata()
+    records = enrich_with_progress(read_metadata())
     return TEMPLATES.TemplateResponse("index.html", {"request": request, "records": records})
 
 

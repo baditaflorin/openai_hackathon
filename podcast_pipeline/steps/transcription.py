@@ -6,9 +6,9 @@ import tempfile
 from pathlib import Path
 from openai import OpenAI
 
-# ffmpeg-based conversion to ensure Whisper-supported audio formats
-SUPPORTED_AUDIO_EXTENSIONS = {
-    "flac", "m4a", "mp3", "mp4", "mpeg", "mpga", "oga", "ogg", "wav", "webm"
+# ffmpeg-based conversion to ensure Whisper-compatible audio formats (audio-only)
+AUDIO_ONLY_EXTENSIONS = {
+    "flac", "m4a", "mp3", "mpga", "oga", "ogg", "wav"
 }
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -22,14 +22,38 @@ def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
     transcribed sequentially, and recombined into a single transcript.
     """
     src = Path(audio_path)
-    if src.suffix.lower().lstrip('.') not in SUPPORTED_AUDIO_EXTENSIONS:
-        dst = src.with_suffix('.wav')
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", str(src), str(dst)],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+    # Convert any non-audio-only file (e.g. video container) to WAV for Whisper
+    if src.suffix.lower().lstrip('.') not in AUDIO_ONLY_EXTENSIONS:
+        # Ensure there's at least one audio stream before conversion
+        probe = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "a",
+                "-show_entries", "stream=index",
+                "-of", "csv=p=0", str(src),
+            ],
+            capture_output=True,
+            text=True,
         )
+        if not probe.stdout.strip():
+            raise RuntimeError(
+                "No audio track detected. "
+                "Please record with a microphone or choose webcam/screen+webcam recording."
+            )
+        dst = src.with_suffix('.wav')
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(src),
+                "-vn", "-acodec", "pcm_s16le",
+                "-ar", "16000", "-ac", "1",
+                str(dst),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            err = proc.stderr.strip() or proc.stdout.strip()
+            raise RuntimeError(f"Audio conversion failed: {err}")
         audio_path = str(dst)
         src = Path(audio_path)
 
