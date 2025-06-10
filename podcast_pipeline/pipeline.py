@@ -8,6 +8,9 @@ from .agents.distributor import distributor_agent
 
 def run_pipeline():
     """Run the podcast production pipeline and return step outputs."""
+
+def main():
+    """Run the podcast production pipeline."""
     # Step 1: curate content
     result = Runner.run_sync(content_curator_agent, "Find a trending tech topic")
     topic = result.final_output
@@ -36,6 +39,7 @@ def main():
     outputs = run_pipeline()
     for key, value in outputs.items():
         print(f"{key}: {value}\n")
+    Runner.run_sync(distributor_agent, edited_audio)
 
 
 if __name__ == "__main__":
