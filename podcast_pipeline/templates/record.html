@@ -11,6 +11,10 @@
   <div class="container py-4">
     <h1 class="mb-3">Episode Details: {{ record.filename }}</h1>
     <p><strong>Uploaded at:</strong> {{ record.upload_time }}</p>
+    {% if record.original_duration is defined %}
+    <p><strong>Original duration:</strong> {{ record.original_duration | round(2) }} seconds</p>
+    <p><strong>Trimmed duration:</strong> {{ record.trimmed_duration | round(2) }} seconds</p>
+    {% endif %}
 
     <div class="mb-4">
       <h2>Choose a Title</h2>

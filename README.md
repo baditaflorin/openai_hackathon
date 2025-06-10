@@ -126,6 +126,7 @@ Then visit `http://127.0.0.1:8000/` in your browser.
 - On the episode detail page, you'll see 5 suggested titles—choose one as your favorite and save it for later use.
 - Each record’s detail page now shows a **short description** and a **long description** generated from the transcript, along with any referenced **people** and **locations** automatically extracted.
 - You can record your screen, your webcam, or both directly in the web UI; once you finish recording, it’s automatically uploaded and processed.
+- A **Remove silence** checkbox in the upload controls allows you to automatically trim long silent sections from your recordings. The episode detail page will display both the original and trimmed durations when enabled.
 - You can also delete old records (and their audio files) directly from the home page using the "Delete" button next to each processed file.
 
 ### Scheduler
