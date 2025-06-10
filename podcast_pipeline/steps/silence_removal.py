@@ -5,6 +5,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Monkey-patch builtins.buffer for Python 3 compatibility in pydub.pyaudioop
+import builtins
+builtins.buffer = memoryview
+
+# Monkey-patch pydub.pyaudioop._sample_count to use integer division (avoid float in range())
+import pydub.pyaudioop as pyaudioop
+pyaudioop._sample_count = lambda cp, size: len(cp) // size
+
 def remove_silence(
     audio_path: str,
     min_silence_len: int = 1000,
@@ -41,7 +49,8 @@ def remove_silence(
         logger.exception(f"remove_silence: split_on_silence failed for {src}")
         raise
     logger.info(f"remove_silence: {len(chunks)} chunks detected")
-    combined = AudioSegment.empty()
+    # build an empty segment matching original audio parameters to avoid sample-width mismatch
+    combined = sound[:0]
     for chunk in chunks:
         combined += chunk
     output_path = src.with_name(f"{src.stem}_trimmed{src.suffix}")
