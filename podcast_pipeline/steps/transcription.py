@@ -5,6 +5,7 @@ import tempfile
 
 from pathlib import Path
 from openai import OpenAI
+import logging
 
 # ffmpeg-based conversion to ensure Whisper-compatible audio formats (audio-only)
 AUDIO_ONLY_EXTENSIONS = {
@@ -15,6 +16,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url="https://api.opena
 
 MAX_CHUNK_SIZE_BYTES = 25 * 1024 * 1024  # 25MB limit for Whisper API
 
+logger = logging.getLogger(__name__)
+
 def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
     """
     Transcribe an audio file to text using OpenAI's Whisper model.
@@ -22,9 +25,11 @@ def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
     transcribed sequentially, and recombined into a single transcript.
     """
     src = Path(audio_path)
+    logger.info(f"transcribe_audio: input file {src}")
     # Convert any non-audio-only file (e.g. video container) to WAV for Whisper
     if src.suffix.lower().lstrip('.') not in AUDIO_ONLY_EXTENSIONS:
         # Ensure there's at least one audio stream before conversion
+        logger.info("transcribe_audio: non-audio-only format detected, converting to WAV")
         probe = subprocess.run(
             [
                 "ffprobe", "-v", "error",
@@ -53,12 +58,15 @@ def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
         )
         if proc.returncode != 0:
             err = proc.stderr.strip() or proc.stdout.strip()
+            logger.error(f"transcribe_audio: audio conversion failed: {err}")
             raise RuntimeError(f"Audio conversion failed: {err}")
         audio_path = str(dst)
         src = Path(audio_path)
 
     file_size = src.stat().st_size
+    logger.info(f"transcribe_audio: file size {file_size} bytes")
     if file_size > MAX_CHUNK_SIZE_BYTES:
+        logger.info("transcribe_audio: file exceeds max chunk size, splitting audio")
         result = subprocess.run(
             [
                 "ffprobe",
@@ -81,6 +89,7 @@ def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
         transcripts: list[str] = []
         with tempfile.TemporaryDirectory(dir=src.parent) as tmpdir:
             pattern = Path(tmpdir) / f"chunk_%03d{src.suffix}"
+            logger.info(f"transcribe_audio: splitting into chunks with pattern {pattern}, segment_time {chunk_duration}")
             subprocess.run(
                 [
                     "ffmpeg",
@@ -98,23 +107,25 @@ def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
                     str(pattern),
                 ],
                 check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
             )
             for chunk_file in sorted(Path(tmpdir).glob(f"chunk_*{src.suffix}")):
+                logger.info(f"transcribe_audio: transcribing chunk {chunk_file.name}")
                 with open(chunk_file, "rb") as audio_file:
                     response = client.audio.transcriptions.create(
                         file=audio_file,
                         model=model,
                         response_format="text",
                     )
-                    transcripts.append(response)
+                transcripts.append(response)
+                logger.info(f"transcribe_audio: completed chunk {chunk_file.name}")
         return "\n".join(transcripts)
 
     with open(audio_path, "rb") as audio_file:
+        logger.info("transcribe_audio: file size within limit, performing direct transcription")
         response = client.audio.transcriptions.create(
             file=audio_file,
             model=model,
             response_format="text",
         )
+    logger.info("transcribe_audio: direct transcription complete")
     return response

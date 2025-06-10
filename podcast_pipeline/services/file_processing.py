@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from uuid import uuid4
 from datetime import datetime
 
@@ -29,11 +30,15 @@ async def process_file_async(
     """
     # determine or generate the record ID for status tracking
     rec_id = record_id or str(uuid4())
+    logger = logging.getLogger(__name__)
+    logger.info(f"[{rec_id}] Starting processing file {file_path}, remove_silence={remove_silence}")
 
     try:
         # transcription stage
         update_progress(rec_id, "transcribing")
+        logger.info(f"[{rec_id}] Beginning transcription")
         transcript = await asyncio.to_thread(transcribe_audio, file_path)
+        logger.info(f"[{rec_id}] Transcription complete ({len(transcript)} characters)")
 
         # description and entity extraction stage
         update_progress(rec_id, "descriptions")
@@ -50,6 +55,7 @@ async def process_file_async(
         # audio editing stage
         update_progress(rec_id, "editing")
         edited_audio = await edit_audio_async(file_path)
+        logger.info(f"[{rec_id}] Audio editing complete, output file: {edited_audio}")
 
         # optional silence removal stage
         original_duration = None

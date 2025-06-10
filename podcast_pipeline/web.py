@@ -2,7 +2,9 @@
 Main FastAPI application entrypoint: mounts static files and includes routers.
 """
 import os
+import logging
 
+logging.basicConfig(level=logging.INFO)
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 

@@ -10,6 +10,7 @@ STAGE_PROGRESS: dict[str, int] = {
     "entities": 40,
     "titles": 50,
     "script": 60,
+    "remove_silence": 65,
     "editing": 75,
     "distribution": 90,
     "complete": 100,
