@@ -9,6 +9,26 @@ This repository contains a minimal prototype of a podcast production pipeline bu
 - **Distributor Agent** – Publishes episodes.
 
 ## Usage
+### Authentication
+
+Make sure you have your OpenAI API key set in your environment:
+
+```bash
+export OPENAI_API_KEY="your_openai_api_key_here"
+```
+
+### Prerequisites
+
+Ensure you have `ffmpeg` installed and available on your PATH so uploaded audio can be converted into a Whisper-supported format:
+
+```bash
+# macOS (Homebrew)
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+```
+
 Install dependencies and run the example pipeline:
 ```bash
 pip install -r requirements.txt
@@ -17,15 +37,20 @@ python -m podcast_pipeline.pipeline
 
 ### Modular API
 
-You can also import and run individual pipeline steps:
+You can also import and run individual pipeline steps (including transcription):
 ```python
 from podcast_pipeline.steps import (
+    transcribe_audio,
     curate_content,
     generate_script,
     edit_audio,
     distribute,
 )
 
+# Transcribe a raw audio file to text
+transcript = transcribe_audio("path/to/raw_audio.mp3")
+
+# Curate content, generate script, edit audio, and distribute
 topic = curate_content("Find a trending tech topic")
 script = generate_script(topic)
 edited_audio = edit_audio("path/to/raw_audio.mp3")
@@ -59,3 +84,16 @@ python -m podcast_pipeline.gui
 > ```
 >
 > **Windows**: Make sure you installed Python from python.org, which includes Tcl/Tk by default.
+
+### Web Application
+
+You can also run a FastAPI-based web interface for drag-and-drop file upload and processing:
+
+```bash
+pip install -r requirements.txt
+uvicorn podcast_pipeline.web:app --reload
+```
+
+Then visit `http://127.0.0.1:8000/` in your browser.
+
+You can either drag-and-drop your audio file or click the "Or select file" button in the web UI to upload.
