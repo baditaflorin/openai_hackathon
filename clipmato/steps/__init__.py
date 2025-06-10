@@ -1,6 +1,7 @@
 """
-Podcast production pipeline steps: curation, scripting, editing, distribution,
-title suggestion, and transcription.
+Clipmato pipeline steps: content curation, script generation, audio editing,
+distribution, title suggestion, description generation, entity extraction,
+silence removal, and transcription.
 """
 from .content_curation import curate_content, curate_content_async
 from .script_generation import generate_script, generate_script_async

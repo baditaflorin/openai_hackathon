@@ -1,37 +1,24 @@
 import json
-from agents import Runner
+import json
 from ..agents.title_suggester import title_suggester_agent
+from .step_utils import run_agent_async, run_agent_sync, parse_list
+
 
 def propose_titles(transcript: str) -> list[str]:
     """Use the Title Suggester agent to propose 5 episode titles."""
-    result = Runner.run_sync(title_suggester_agent, transcript)
-    raw = result.final_output.strip()
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        if lines and lines[0].startswith("```"):
-            lines.pop(0)
-        if lines and lines[-1].startswith("```"):
-            lines.pop(-1)
-        raw = "\n".join(lines)
-    try:
-        titles = json.loads(raw)
-        return titles if isinstance(titles, list) else []
-    except Exception:
-        return [line.strip() for line in raw.splitlines() if line.strip()]
+    return run_agent_sync(
+        title_suggester_agent,
+        transcript,
+        default=[],
+        parse_fn=parse_list,
+    ) or []
+
 
 async def propose_titles_async(transcript: str) -> list[str]:
     """Asynchronously use the Title Suggester agent to propose 5 episode titles."""
-    result = await Runner.run(title_suggester_agent, transcript)
-    raw = result.final_output.strip()
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        if lines and lines[0].startswith("```"):
-            lines.pop(0)
-        if lines and lines[-1].startswith("```"):
-            lines.pop(-1)
-        raw = "\n".join(lines)
-    try:
-        titles = json.loads(raw)
-        return titles if isinstance(titles, list) else []
-    except Exception:
-        return [line.strip() for line in raw.splitlines() if line.strip()]
+    return await run_agent_async(
+        title_suggester_agent,
+        transcript,
+        default=[],
+        parse_fn=parse_list,
+    ) or []

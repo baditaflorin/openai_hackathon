@@ -1,8 +1,8 @@
 import json
-from pathlib import Path
+from ..config import METADATA_PATH
 
-BASE_DIR = Path(__file__).parent.parent
-metadata_path = BASE_DIR / "uploads" / "metadata.json"
+# File where metadata records are stored
+metadata_path = METADATA_PATH
 
 def read_metadata() -> list[dict]:
     """

@@ -1,10 +1,10 @@
 import shutil
-from pathlib import Path
 from fastapi import UploadFile
+from ..config import UPLOAD_DIR
 
-BASE_DIR = Path(__file__).parent.parent
-upload_dir = BASE_DIR / "uploads"
-upload_dir.mkdir(exist_ok=True)
+# Directory where uploaded files are stored
+upload_dir = UPLOAD_DIR
+upload_dir.mkdir(parents=True, exist_ok=True)
 
 def save_upload_file(upload_file: UploadFile) -> str:
     """

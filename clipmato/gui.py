@@ -1,5 +1,5 @@
 """
-GUI entrypoint for running the podcast pipeline via Tkinter.
+GUI entrypoint for running the Clipmato pipeline via Tkinter.
 """
 from .cli.gui import run
 

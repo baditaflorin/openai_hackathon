@@ -3,12 +3,13 @@ Routes for scheduling episodes, both manual and automatic.
 """
 from fastapi import APIRouter, Request, HTTPException, Form
 import calendar
+import logging
 from datetime import datetime
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from ..utils.metadata import read_metadata, update_metadata
-from ..services.scheduling import propose_schedule_async
-from ..config import TEMPLATES
+from .common import read_metadata, update_metadata, propose_schedule_async, TEMPLATES
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -30,7 +31,7 @@ async def scheduler_page(request: Request):
                 events.append({
                     "day": dt.day,
                     "time": dt.strftime("%I:%M %p"),
-                    "title": rec.get("selected_title", ""),
+                    "title": rec.get("selected_title") or rec.get("filename", ""),
                 })
     return TEMPLATES.TemplateResponse(
         "scheduler.html",
@@ -49,8 +50,14 @@ async def scheduler_page(request: Request):
 @router.post("/scheduler/auto", response_class=RedirectResponse)
 async def scheduler_auto(cadence: str = Form("daily"), n_days: int | None = Form(None)):
     """Automatically propose and save schedule times for unscheduled records."""
+    logger.info(
+        "Auto-scheduling request: cadence=%s, n_days=%s",
+        cadence,
+        n_days,
+    )
     records = read_metadata()
-    unscheduled = [rec for rec in records if rec.get("selected_title") and not rec.get("schedule_time")]
+    # schedule all unscheduled records (titles optional)
+    unscheduled = [rec for rec in records if not rec.get("schedule_time")]
     if unscheduled:
         suggestions = await propose_schedule_async(unscheduled, cadence=cadence, n_days=n_days)
         for rid, stime in suggestions.items():

@@ -15,6 +15,7 @@ from ..steps.distribution import distribute_async
 from ..utils.progress import update_progress
 from ..utils.metadata import append_metadata
 from ..steps.silence_removal import remove_silence as remove_silence_step
+from .service_utils import run_stage
 
 async def process_file_async(
     file_path: str,
@@ -34,41 +35,43 @@ async def process_file_async(
     logger.info(f"[{rec_id}] Starting processing file {file_path}, remove_silence={remove_silence}")
 
     try:
-        # transcription stage
-        update_progress(rec_id, "transcribing")
-        logger.info(f"[{rec_id}] Beginning transcription")
-        transcript = await asyncio.to_thread(transcribe_audio, file_path)
-        logger.info(f"[{rec_id}] Transcription complete ({len(transcript)} characters)")
+        transcript = await run_stage(
+            rec_id,
+            "transcribing",
+            transcribe_audio,
+            file_path,
+            to_thread=True,
+            log_result=lambda r: f"{len(r)} characters",
+        )
 
-        # description and entity extraction stage
-        update_progress(rec_id, "descriptions")
-        desc = await generate_descriptions_async(transcript)
-        update_progress(rec_id, "entities")
-        entities = await extract_entities_async(transcript)
+        desc = await run_stage(rec_id, "descriptions", generate_descriptions_async, transcript)
+        entities = await run_stage(rec_id, "entities", extract_entities_async, transcript)
 
-        # title suggestion and script generation stage
-        update_progress(rec_id, "titles")
-        titles = await propose_titles_async(transcript)
-        update_progress(rec_id, "script")
-        script = await generate_script_async(transcript)
+        titles = await run_stage(rec_id, "titles", propose_titles_async, transcript)
+        script = await run_stage(rec_id, "script", generate_script_async, transcript)
 
-        # audio editing stage
-        update_progress(rec_id, "editing")
-        edited_audio = await edit_audio_async(file_path)
-        logger.info(f"[{rec_id}] Audio editing complete, output file: {edited_audio}")
+        edited_audio = await run_stage(
+            rec_id,
+            "editing",
+            edit_audio_async,
+            file_path,
+            log_result=lambda path: f"output file: {path}",
+        )
 
         # optional silence removal stage
         original_duration = None
         trimmed_duration = None
         if remove_silence:
-            update_progress(rec_id, "remove_silence")
-            original_duration, trimmed_duration, edited_audio = await asyncio.to_thread(
-                remove_silence_step, edited_audio
+            original_duration, trimmed_duration, edited_audio = await run_stage(
+                rec_id,
+                "remove_silence",
+                remove_silence_step,
+                edited_audio,
+                to_thread=True,
+                log_result=lambda res: f"original={res[0]:.2f}s trimmed={res[1]:.2f}s",
             )
 
-        # distribution stage
-        update_progress(rec_id, "distribution")
-        distribution = await distribute_async(edited_audio)
+        distribution = await run_stage(rec_id, "distribution", distribute_async, edited_audio)
 
         # finalize and save metadata
         record = {

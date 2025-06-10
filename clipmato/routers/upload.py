@@ -3,13 +3,17 @@ Routes for handling file uploads and rendering upload/index pages.
 """
 from fastapi import APIRouter, File, UploadFile, Request, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
-
-from ..utils.file_io import save_upload_file
-from ..services.file_processing import process_file_async
-from ..utils.metadata import read_metadata
-from ..utils.progress import update_progress, read_progress, enrich_with_progress
-from ..config import TEMPLATES
 from uuid import uuid4
+
+from .common import (
+    save_upload_file,
+    process_file_async,
+    read_metadata,
+    update_progress,
+    read_progress,
+    enrich_with_progress,
+    TEMPLATES,
+)
 
 router = APIRouter()
 

@@ -3,32 +3,39 @@ import subprocess
 import math
 import tempfile
 
+import os
+import subprocess
+import math
+import tempfile
+
 from pathlib import Path
-from openai import OpenAI
 import logging
+from openai import OpenAI
 
-# ffmpeg-based conversion to ensure Whisper-compatible audio formats (audio-only)
-AUDIO_ONLY_EXTENSIONS = {
-    "flac", "m4a", "mp3", "mpga", "oga", "ogg", "wav"
-}
+from ..config import (
+    AUDIO_ONLY_EXTENSIONS,
+    MAX_CHUNK_SIZE_BYTES,
+    WHISPER_MODEL,
+    FFMPEG_SAMPLE_RATE,
+    FFMPEG_CHANNELS,
+    FFMPEG_AUDIO_CODEC,
+)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url="https://api.openai.com/v1")
-
-MAX_CHUNK_SIZE_BYTES = 25 * 1024 * 1024  # 25MB limit for Whisper API
-
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"), base_url="https://api.openai.com/v1"
+)
 logger = logging.getLogger(__name__)
 
-def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
+def transcribe_audio(audio_path: str, model: str = WHISPER_MODEL) -> str:
     """
     Transcribe an audio file to text using OpenAI's Whisper model.
-    Audio files larger than 25MB will be split into smaller segments,
-    transcribed sequentially, and recombined into a single transcript.
+    Audio files larger than MAX_CHUNK_SIZE_BYTES will be split into
+    smaller segments, transcribed sequentially, and recombined.
     """
     src = Path(audio_path)
     logger.info(f"transcribe_audio: input file {src}")
     # Convert any non-audio-only file (e.g. video container) to WAV for Whisper
     if src.suffix.lower().lstrip('.') not in AUDIO_ONLY_EXTENSIONS:
-        # Ensure there's at least one audio stream before conversion
         logger.info("transcribe_audio: non-audio-only format detected, converting to WAV")
         probe = subprocess.run(
             [
@@ -49,8 +56,9 @@ def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
         proc = subprocess.run(
             [
                 "ffmpeg", "-y", "-i", str(src),
-                "-vn", "-acodec", "pcm_s16le",
-                "-ar", "16000", "-ac", "1",
+                "-vn", "-acodec", FFMPEG_AUDIO_CODEC,
+                "-ar", str(FFMPEG_SAMPLE_RATE),
+                "-ac", str(FFMPEG_CHANNELS),
                 str(dst),
             ],
             capture_output=True,
@@ -66,7 +74,10 @@ def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
     file_size = src.stat().st_size
     logger.info(f"transcribe_audio: file size {file_size} bytes")
     if file_size > MAX_CHUNK_SIZE_BYTES:
-        logger.info("transcribe_audio: file exceeds max chunk size, splitting audio")
+        logger.info(
+            "transcribe_audio: file exceeds max chunk size (%d bytes), splitting audio",
+            MAX_CHUNK_SIZE_BYTES,
+        )
         result = subprocess.run(
             [
                 "ffprobe",
@@ -89,7 +100,11 @@ def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
         transcripts: list[str] = []
         with tempfile.TemporaryDirectory(dir=src.parent) as tmpdir:
             pattern = Path(tmpdir) / f"chunk_%03d{src.suffix}"
-            logger.info(f"transcribe_audio: splitting into chunks with pattern {pattern}, segment_time {chunk_duration}")
+            logger.info(
+                "transcribe_audio: splitting into chunks with pattern %s, segment_time %ds",
+                pattern,
+                chunk_duration,
+            )
             subprocess.run(
                 [
                     "ffmpeg",

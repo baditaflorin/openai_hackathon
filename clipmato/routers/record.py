@@ -3,11 +3,9 @@ Routes for viewing and managing individual episode records.
 """
 from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-
-from ..utils.metadata import read_metadata, update_metadata, remove_metadata
-from ..config import TEMPLATES
-from ..utils.file_io import upload_dir
 from pathlib import Path
+
+from .common import read_metadata, update_metadata, remove_metadata, upload_dir, TEMPLATES
 
 router = APIRouter()
 

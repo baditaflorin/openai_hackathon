@@ -2,6 +2,7 @@
 Run the full Clipmato production pipeline or import individual steps programmatically.
 """
 from ..steps import curate_content, generate_script, edit_audio, distribute
+from .ui import run_cli
 
 def run_pipeline():
     """Run the Clipmato production pipeline and return step outputs."""
@@ -18,10 +19,8 @@ def run_pipeline():
     }
 
 def main():
-    """Run the Clipmato production pipeline."""
-    outputs = run_pipeline()
-    for key, value in outputs.items():
-        print(f"{key}: {value}\n")
+    """Run the Clipmato production pipeline in CLI mode."""
+    run_cli(run_pipeline)
 
 if __name__ == "__main__":
     main()

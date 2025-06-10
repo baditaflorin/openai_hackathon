@@ -2,19 +2,7 @@ import json
 from pathlib import Path
 
 from .file_io import upload_dir
-
-# Mapping of pipeline stages to progress percentages
-STAGE_PROGRESS: dict[str, int] = {
-    "transcribing": 20,
-    "descriptions": 30,
-    "entities": 40,
-    "titles": 50,
-    "script": 60,
-    "remove_silence": 65,
-    "editing": 75,
-    "distribution": 90,
-    "complete": 100,
-}
+from ..config import STAGE_PROGRESS
 
 
 def get_status_file(record_id: str) -> Path:
