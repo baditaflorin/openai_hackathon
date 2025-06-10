@@ -6,6 +6,9 @@ from .agents.audio_editor import audio_editor_agent
 from .agents.distributor import distributor_agent
 
 
+def run_pipeline():
+    """Run the podcast production pipeline and return step outputs."""
+
 def main():
     """Run the podcast production pipeline."""
     # Step 1: curate content
@@ -21,6 +24,21 @@ def main():
     edited_audio = result.final_output
 
     # Step 4: distribute
+    result = Runner.run_sync(distributor_agent, edited_audio)
+    distribution = result.final_output
+
+    return {
+        "topic": topic,
+        "script": script,
+        "edited_audio": edited_audio,
+        "distribution": distribution,
+    }
+
+
+def main():
+    outputs = run_pipeline()
+    for key, value in outputs.items():
+        print(f"{key}: {value}\n")
     Runner.run_sync(distributor_agent, edited_audio)
 
 
