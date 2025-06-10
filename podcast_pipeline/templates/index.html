@@ -14,6 +14,23 @@
     <button id="file_select_btn">Or select file</button>
     <input type="file" id="file_input" style="display: none;">
   </div>
+
+  {% if records %}
+  <h2>Processed Files</h2>
+  <ul id="records_list">
+    {% for rec in records %}
+    <li>
+      <a href="/record/{{ rec.id }}">{{ rec.filename }} ({{ rec.upload_time }})</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <!-- Loading overlay shown while processing upload -->
+  <div id="loading">
+    <div class="spinner"></div>
+  </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>

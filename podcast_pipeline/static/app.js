@@ -3,17 +3,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileInput = document.getElementById('file_input');
   const fileSelectBtn = document.getElementById('file_select_btn');
 
+  const loadingOverlay = document.getElementById('loading');
+
   const handleFile = async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch('/upload', {
-      method: 'POST',
-      body: formData,
-    });
-    const html = await response.text();
-    document.open();
-    document.write(html);
-    document.close();
+    loadingOverlay.classList.add('show');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        throw new Error(`Upload failed with status ${response.status}`);
+      }
+      const html = await response.text();
+      document.open();
+      document.write(html);
+      document.close();
+    } catch (err) {
+      console.error(err);
+      loadingOverlay.classList.remove('show');
+      alert(`Upload error: ${err}`);
+    }
   };
 
   fileSelectBtn.addEventListener('click', () => fileInput.click());
