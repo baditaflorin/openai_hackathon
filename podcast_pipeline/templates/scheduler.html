@@ -10,6 +10,36 @@
 <body>
   <div class="container py-4">
     <h1 class="mb-4">Episode Scheduler</h1>
+
+    <h2>Publication Calendar</h2>
+    <table class="table table-bordered text-center mb-4">
+      <thead>
+        <tr><th colspan="7">{{ month_name }} {{ year }}</th></tr>
+        <tr>
+          {% for d in ['Su','Mo','Tu','We','Th','Fr','Sa'] %}
+          <th>{{ d }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for week in calendar %}
+      <tr>
+        {% for day in week %}
+        <td>
+          {% if day %}
+          <div><strong>{{ day }}</strong></div>
+          {% for ev in events if ev.day == day %}
+          <div class="small mt-1">
+            {{ ev.time }}<br>{{ ev.title }}
+          </div>
+          {% endfor %}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
     <div class="mb-3">
       <form method="post" action="/scheduler/auto" class="row g-2 align-items-center" \
             onsubmit="document.getElementById('sched-loading').classList.remove('d-none')">

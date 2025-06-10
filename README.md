@@ -124,6 +124,7 @@ Then visit `http://127.0.0.1:8000/` in your browser.
 - If your audio file exceeds OpenAI Whisper's 25MB upload limit, it will be automatically split into smaller segments and transcribed sequentially, then combined into a single transcript.
 - On the episode detail page, you'll see 5 suggested titles—choose one as your favorite and save it for later use.
 - Each record’s detail page now shows a **short description** and a **long description** generated from the transcript, along with any referenced **people** and **locations** automatically extracted.
+- You can record your screen, your webcam, or both directly in the web UI; once you finish recording, it’s automatically uploaded and processed.
 - You can also delete old records (and their audio files) directly from the home page using the "Delete" button next to each processed file.
 
 ### Scheduler
@@ -131,6 +132,7 @@ Then visit `http://127.0.0.1:8000/` in your browser.
 A scheduling page is available at `/scheduler` to manually or automatically assign posting dates to your processed episodes:
 
 - Click the **Scheduler** button on the home page (or visit `/scheduler`) to view all episodes with their chosen title.
+- A publication calendar at the top displays all scheduled release dates for the current month.
 - Use **Auto-Schedule All** to automatically propose posting dates based on your selected cadence (daily, weekly, or every N days). Make sure you've chosen a title for each unscheduled episode first.
 - Manually set each episode’s date/time and select **publish destinations** (YouTube, Spotify, Apple Podcasts) using the form controls, then click **Save**. You cannot schedule an episode until a title has been selected.
 

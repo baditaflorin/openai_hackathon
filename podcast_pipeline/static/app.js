@@ -8,6 +8,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressBar = document.getElementById('progress_bar');
   const progressLabel = document.getElementById('progress_label');
 
+  const recordControls = document.getElementById('record_controls');
+  const recordScreenBtn = document.getElementById('record_screen_btn');
+  const recordWebcamBtn = document.getElementById('record_webcam_btn');
+  const recordBothBtn = document.getElementById('record_both_btn');
+  let mediaRecorder;
+  let mediaChunks = [];
   // Define stages for client-side progress bar
   const STAGE_INFO = {
     uploading:   { label: 'Uploading file...',       percent: 10 },
@@ -94,6 +100,45 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     xhr.send(formData);
   };
+
+  const startRecording = async (captureScreen, captureWebcam) => {
+    const streams = [];
+    if (captureScreen) {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      streams.push(screenStream);
+    }
+    if (captureWebcam) {
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streams.push(camStream);
+    }
+    const tracks = streams.flatMap(s => s.getTracks());
+    const stream = new MediaStream(tracks);
+    mediaChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => mediaChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(mediaChunks, { type: mediaChunks[0]?.type });
+      const file = new File([blob], 'recording.webm', { type: blob.type });
+      handleFile(file);
+      recordScreenBtn.disabled = false;
+      recordWebcamBtn.disabled = false;
+      recordBothBtn.disabled = false;
+      stopBtn.remove();
+    };
+    const stopBtn = document.createElement('button');
+    stopBtn.textContent = 'Stop Recording';
+    stopBtn.className = 'btn btn-danger ms-2';
+    stopBtn.onclick = () => mediaRecorder.stop();
+    recordControls.appendChild(stopBtn);
+    recordScreenBtn.disabled = true;
+    recordWebcamBtn.disabled = true;
+    recordBothBtn.disabled = true;
+    mediaRecorder.start();
+  };
+
+  recordScreenBtn.addEventListener('click', () => startRecording(true, false));
+  recordWebcamBtn.addEventListener('click', () => startRecording(false, true));
+  recordBothBtn.addEventListener('click', () => startRecording(true, true));
 
   fileSelectBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => {

@@ -2,6 +2,8 @@
 Routes for scheduling episodes, both manual and automatic.
 """
 from fastapi import APIRouter, Request, HTTPException, Form
+import calendar
+from datetime import datetime
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ..utils.metadata import read_metadata, update_metadata
@@ -15,7 +17,33 @@ router = APIRouter()
 async def scheduler_page(request: Request):
     """Show the scheduling page for manual or automatic scheduling."""
     records = read_metadata()
-    return TEMPLATES.TemplateResponse("scheduler.html", {"request": request, "records": records})
+    today = datetime.today()
+    year = today.year
+    month = today.month
+    cal = calendar.monthcalendar(year, month)
+    events: list[dict] = []
+    for rec in records:
+        st = rec.get("schedule_time")
+        if st:
+            dt = datetime.fromisoformat(st)
+            if dt.year == year and dt.month == month:
+                events.append({
+                    "day": dt.day,
+                    "time": dt.strftime("%I:%M %p"),
+                    "title": rec.get("selected_title", ""),
+                })
+    return TEMPLATES.TemplateResponse(
+        "scheduler.html",
+        {
+            "request": request,
+            "records": records,
+            "calendar": cal,
+            "month": month,
+            "year": year,
+            "month_name": calendar.month_name[month],
+            "events": events,
+        },
+    )
 
 
 @router.post("/scheduler/auto", response_class=RedirectResponse)
