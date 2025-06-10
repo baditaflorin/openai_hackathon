@@ -95,6 +95,7 @@ async def process_file_async(
         update_progress(rec_id, "complete")
         return record
     except Exception as exc:
+        logger.exception(f"[{rec_id}] Error during file processing")
         err_msg = str(exc)
         update_progress(rec_id, "error", err_msg)
         record = {

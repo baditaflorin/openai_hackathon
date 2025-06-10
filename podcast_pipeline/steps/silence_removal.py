@@ -30,12 +30,16 @@ def remove_silence(
         f"remove_silence: splitting (min_silence_len={min_silence_len}, "
         f"silence_thresh={silence_thresh}, keep_silence={keep_silence})"
     )
-    chunks = split_on_silence(
-        sound,
-        min_silence_len=min_silence_len,
-        silence_thresh=silence_thresh,
-        keep_silence=keep_silence,
-    )
+    try:
+        chunks = split_on_silence(
+            sound,
+            min_silence_len=min_silence_len,
+            silence_thresh=silence_thresh,
+            keep_silence=keep_silence,
+        )
+    except Exception:
+        logger.exception(f"remove_silence: split_on_silence failed for {src}")
+        raise
     logger.info(f"remove_silence: {len(chunks)} chunks detected")
     combined = AudioSegment.empty()
     for chunk in chunks:
