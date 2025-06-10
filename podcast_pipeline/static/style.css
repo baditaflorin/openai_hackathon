@@ -1,0 +1,35 @@
+#drop_zone {
+  border: 2px dashed #888;
+  border-radius: 8px;
+  width: 300px;
+  height: 150px;
+  line-height: 150px;
+  text-align: center;
+  color: #888;
+  margin: 50px auto;
+  font-size: 1.2rem;
+}
+#drop_zone.hover {
+  border-color: #444;
+  color: #444;
+}
+body {
+  font-family: sans-serif;
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  line-height: 1.6;
+}
+pre {
+  background: #f4f4f4;
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+#drop_zone button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}

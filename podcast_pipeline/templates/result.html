@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Podcast Pipeline Results</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>Processing Results for {{ filename }}</h1>
+  <section>
+    <h2>Transcript</h2>
+    <pre>{{ transcript }}</pre>
+  </section>
+  <section>
+    <h2>Script</h2>
+    <pre>{{ script }}</pre>
+  </section>
+  <section>
+    <h2>Distribution</h2>
+    <pre>{{ distribution }}</pre>
+  </section>
+  <p><a href="/">Upload another file</a></p>
+</body>
+</html>
