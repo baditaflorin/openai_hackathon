@@ -1,4 +1,13 @@
-import tkinter as tk
+import sys
+
+try:
+    import tkinter as tk
+except ModuleNotFoundError:
+    sys.stderr.write(
+        "Error: The tkinter module is not available. "
+        "Please install Tcl/Tk support for your Python distribution and refer to README.md for details.\n"
+    )
+    sys.exit(1)
 from .pipeline import run_pipeline
 
 

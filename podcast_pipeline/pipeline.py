@@ -1,31 +1,15 @@
-from agents import Agent, Runner
-
-from .agents.content_curator import content_curator_agent
-from .agents.script_writer import script_writer_agent
-from .agents.audio_editor import audio_editor_agent
-from .agents.distributor import distributor_agent
+"""
+Run the full podcast production pipeline or import individual steps programmatically.
+"""
+from .steps import curate_content, generate_script, edit_audio, distribute
 
 
 def run_pipeline():
     """Run the podcast production pipeline and return step outputs."""
-
-def main():
-    """Run the podcast production pipeline."""
-    # Step 1: curate content
-    result = Runner.run_sync(content_curator_agent, "Find a trending tech topic")
-    topic = result.final_output
-
-    # Step 2: generate script
-    result = Runner.run_sync(script_writer_agent, topic)
-    script = result.final_output
-
-    # Step 3: edit audio (placeholder)
-    result = Runner.run_sync(audio_editor_agent, "process raw audio")
-    edited_audio = result.final_output
-
-    # Step 4: distribute
-    result = Runner.run_sync(distributor_agent, edited_audio)
-    distribution = result.final_output
+    topic = curate_content("Find a trending tech topic")
+    script = generate_script(topic)
+    edited_audio = edit_audio("process raw audio")
+    distribution = distribute(edited_audio)
 
     return {
         "topic": topic,
@@ -36,10 +20,10 @@ def main():
 
 
 def main():
+    """Run the podcast production pipeline."""
     outputs = run_pipeline()
     for key, value in outputs.items():
         print(f"{key}: {value}\n")
-    Runner.run_sync(distributor_agent, edited_audio)
 
 
 if __name__ == "__main__":
