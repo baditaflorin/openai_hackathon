@@ -14,3 +14,9 @@ Install dependencies and run the example pipeline:
 pip install -r requirements.txt
 python -m podcast_pipeline.pipeline
 ```
+
+### GUI
+You can also launch a very small Tkinter interface:
+```bash
+python -m podcast_pipeline.gui
+```
