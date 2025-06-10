@@ -11,11 +11,13 @@ from ..steps.audio_editing import edit_audio_async
 from ..steps.distribution import distribute_async
 from ..utils.progress import update_progress
 from ..utils.metadata import append_metadata
+from ..steps.silence_removal import remove_silence
 
 async def process_file_async(
     file_path: str,
     filename: str,
     record_id: str | None = None,
+    remove_silence: bool = False,
 ) -> dict:
     """
     Process an uploaded file through transcription, description & entity extraction,
@@ -43,9 +45,20 @@ async def process_file_async(
         update_progress(rec_id, "script")
         script = await generate_script_async(transcript)
 
-        # audio editing and distribution stage
+        # audio editing stage
         update_progress(rec_id, "editing")
         edited_audio = await edit_audio_async(file_path)
+
+        # optional silence removal stage
+        original_duration = None
+        trimmed_duration = None
+        if remove_silence:
+            update_progress(rec_id, "remove_silence")
+            original_duration, trimmed_duration, edited_audio = await asyncio.to_thread(
+                remove_silence, edited_audio
+            )
+
+        # distribution stage
         update_progress(rec_id, "distribution")
         distribution = await distribute_async(edited_audio)
 
@@ -65,6 +78,9 @@ async def process_file_async(
             "edited_audio": edited_audio,
             "distribution": distribution,
         }
+        if remove_silence:
+            record["original_duration"] = original_duration
+            record["trimmed_duration"] = trimmed_duration
         append_metadata(record)
 
         # complete

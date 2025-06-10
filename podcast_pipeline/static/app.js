@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     entities:    { label: 'Extracting entities...',    percent: 40 },
     titles:      { label: 'Suggesting titles...',     percent: 50 },
     script:      { label: 'Generating script...',     percent: 60 },
+    remove_silence: { label: 'Removing silence...',     percent: 65 },
     editing:     { label: 'Editing audio...',         percent: 75 },
     distribution:{ label: 'Distributing audio...',     percent: 90 },
     complete:    { label: 'Finalizing...',            percent:100 },
@@ -58,6 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const handleFile = (file) => {
     const formData = new FormData();
     formData.append('file', file);
+    const removeSilence = document.getElementById('remove_silence_checkbox').checked;
+    formData.append('remove_silence', removeSilence);
     const placeholderId = Date.now().toString();
     const { badge, progBar, cardBody, col } = createJobCard(placeholderId, file.name);
     const xhr = new XMLHttpRequest();

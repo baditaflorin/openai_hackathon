@@ -1,7 +1,7 @@
 """
 Routes for handling file uploads and rendering upload/index pages.
 """
-from fastapi import APIRouter, File, UploadFile, Request, BackgroundTasks
+from fastapi import APIRouter, File, UploadFile, Request, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..utils.file_io import save_upload_file
@@ -26,6 +26,7 @@ async def upload(
     request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    remove_silence: bool = Form(False),
 ) -> JSONResponse:
     """Handle uploaded file: save it, enqueue processing, and return a job ID."""
     file_path = save_upload_file(file)
@@ -33,7 +34,13 @@ async def upload(
     # mark the pipeline as starting (after upload)
     update_progress(record_id, "transcribing")
     # process the file in background (updates metadata and final status)
-    background_tasks.add_task(process_file_async, file_path, file.filename, record_id)
+    background_tasks.add_task(
+        process_file_async,
+        file_path,
+        file.filename,
+        record_id,
+        remove_silence,
+    )
     return JSONResponse({"id": record_id})
 
 
