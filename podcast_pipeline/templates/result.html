@@ -4,22 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Podcast Pipeline Results</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-  <h1>Processing Results for {{ filename }}</h1>
-  <section>
-    <h2>Transcript</h2>
-    <pre>{{ transcript }}</pre>
-  </section>
-  <section>
-    <h2>Script</h2>
-    <pre>{{ script }}</pre>
-  </section>
-  <section>
-    <h2>Distribution</h2>
-    <pre>{{ distribution }}</pre>
-  </section>
-  <p><a href="/">Upload another file</a></p>
+  <div class="container py-4">
+    <h1 class="mb-4">Processing Results for {{ filename }}</h1>
+
+    <div class="mb-4">
+      <h2>Transcript</h2>
+      <pre class="bg-light p-3 border rounded">{{ transcript }}</pre>
+    </div>
+
+    <div class="mb-4">
+      <h2>Script</h2>
+      <pre class="bg-light p-3 border rounded">{{ script }}</pre>
+    </div>
+
+    <div class="mb-4">
+      <h2>Distribution</h2>
+      <pre class="bg-light p-3 border rounded">{{ distribution }}</pre>
+    </div>
+
+    <a href="/record/{{ id }}" class="btn btn-primary me-2">View Details</a>
+    <a href="/" class="btn btn-secondary">Upload another file</a>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

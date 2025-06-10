@@ -4,33 +4,48 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Podcast Pipeline</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-  <h1>Upload an Audio File</h1>
-  <div id="drop_zone">
-    Drop audio file here
-    <br>
-    <button id="file_select_btn">Or select file</button>
-    <input type="file" id="file_input" style="display: none;">
+  <div class="container py-4">
+    <h1 class="mb-4">Podcast Pipeline</h1>
+
+    <div id="drop_zone" class="border border-secondary rounded p-4 text-center mb-4" style="border-style: dashed;">
+      <p class="mb-2">Drop audio file here</p>
+      <button id="file_select_btn" class="btn btn-primary">Select a file</button>
+      <input type="file" id="file_input" style="display: none;">
+    </div>
+
+    {% if records %}
+    <div class="mb-5">
+      <h2>Processed Files</h2>
+      <ul id="records_list" class="list-group">
+        {% for rec in records %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <a href="/record/{{ rec.id }}">{{ rec.filename }}</a>
+            <small class="text-muted ms-2">{{ rec.upload_time }}</small>
+          </div>
+          <form method="post" action="/record/{{ rec.id }}/delete" onsubmit="return confirm('Delete this record and file?');">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- Loading overlay shown while processing upload -->
+    <div id="loading" class="position-fixed w-100 h-100 top-0 start-0 d-none bg-white bg-opacity-75 d-flex justify-content-center align-items-center">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
   </div>
 
-  {% if records %}
-  <h2>Processed Files</h2>
-  <ul id="records_list">
-    {% for rec in records %}
-    <li>
-      <a href="/record/{{ rec.id }}">{{ rec.filename }} ({{ rec.upload_time }})</a>
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-
-  <!-- Loading overlay shown while processing upload -->
-  <div id="loading">
-    <div class="spinner"></div>
-  </div>
-
+  <!-- Bootstrap JS and application script -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

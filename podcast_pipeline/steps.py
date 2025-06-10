@@ -7,8 +7,10 @@ from .agents.content_curator import content_curator_agent
 from .agents.script_writer import script_writer_agent
 from .agents.audio_editor import audio_editor_agent
 from .agents.distributor import distributor_agent
+from .agents.title_suggester import title_suggester_agent
 import os
 import subprocess
+import json
 from pathlib import Path
 from openai import OpenAI
 
@@ -63,6 +65,40 @@ async def distribute_async(audio_output: str) -> str:
     """Asynchronously use the Distributor agent to publish the podcast episode."""
     result = await Runner.run(distributor_agent, audio_output)
     return result.final_output
+
+def propose_titles(transcript: str) -> list[str]:
+    """Use the Title Suggester agent to propose 5 episode titles."""
+    result = Runner.run_sync(title_suggester_agent, transcript)
+    raw = result.final_output.strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines.pop(0)
+        if lines and lines[-1].startswith("```"):
+            lines.pop(-1)
+        raw = "\n".join(lines)
+    try:
+        titles = json.loads(raw)
+        return titles if isinstance(titles, list) else []
+    except Exception:
+        return [line.strip() for line in raw.splitlines() if line.strip()]
+
+async def propose_titles_async(transcript: str) -> list[str]:
+    """Asynchronously use the Title Suggester agent to propose 5 episode titles."""
+    result = await Runner.run(title_suggester_agent, transcript)
+    raw = result.final_output.strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines.pop(0)
+        if lines and lines[-1].startswith("```"):
+            lines.pop(-1)
+        raw = "\n".join(lines)
+    try:
+        titles = json.loads(raw)
+        return titles if isinstance(titles, list) else []
+    except Exception:
+        return [line.strip() for line in raw.splitlines() if line.strip()]
 
 def transcribe_audio(audio_path: str, model: str = "whisper-1") -> str:
     """Transcribe an audio file to text using OpenAI's Whisper model."""

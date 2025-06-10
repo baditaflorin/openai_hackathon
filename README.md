@@ -37,10 +37,11 @@ python -m podcast_pipeline.pipeline
 
 ### Modular API
 
-You can also import and run individual pipeline steps (including transcription):
+You can also import and run individual pipeline steps (including transcription and title suggestions):
 ```python
 from podcast_pipeline.steps import (
     transcribe_audio,
+    propose_titles,
     curate_content,
     generate_script,
     edit_audio,
@@ -48,7 +49,13 @@ from podcast_pipeline.steps import (
 )
 
 # Transcribe a raw audio file to text
+
+# Transcribe a raw audio file to text
 transcript = transcribe_audio("path/to/raw_audio.mp3")
+
+# Get 5 title suggestions from the transcript
+titles = propose_titles(transcript)
+# titles is a list of strings
 
 # Curate content, generate script, edit audio, and distribute
 topic = curate_content("Find a trending tech topic")
@@ -100,3 +107,5 @@ You can either drag-and-drop your audio file or click the "Or select file" butto
 
 - A loading spinner overlay will appear while your file is being uploaded and processed, giving you visual feedback.
 - Processed files will appear in a list below the upload zone; click a filename to view its details.
+- On the episode detail page, you'll see 5 suggested titles—choose one as your favorite and save it for later use.
+- You can also delete old records (and their audio files) directly from the home page using the "Delete" button next to each processed file.
