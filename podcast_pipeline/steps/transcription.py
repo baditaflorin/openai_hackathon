@@ -11,7 +11,7 @@ AUDIO_ONLY_EXTENSIONS = {
     "flac", "m4a", "mp3", "mpga", "oga", "ogg", "wav"
 }
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url="https://api.openai.com/v1")
 
 MAX_CHUNK_SIZE_BYTES = 25 * 1024 * 1024  # 25MB limit for Whisper API
 

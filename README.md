@@ -34,6 +34,8 @@ Install dependencies and run the example pipeline:
 pip install -r requirements.txt
 python -m podcast_pipeline.pipeline
 ```
+> **Note:** We include `simpleaudio` in `requirements.txt` to satisfy pydub’s audio-operation needs.
+> Also ensure your Python build provides the standard `audioop` extension (or install a `pyaudioop` fallback) so that pydub silence removal will work without errors.
 
 ### Modular API
 

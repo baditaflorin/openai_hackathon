@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 from uuid import uuid4
 from datetime import datetime
@@ -11,7 +13,7 @@ from ..steps.audio_editing import edit_audio_async
 from ..steps.distribution import distribute_async
 from ..utils.progress import update_progress
 from ..utils.metadata import append_metadata
-from ..steps.silence_removal import remove_silence
+from ..steps.silence_removal import remove_silence as remove_silence_step
 
 async def process_file_async(
     file_path: str,
@@ -55,7 +57,7 @@ async def process_file_async(
         if remove_silence:
             update_progress(rec_id, "remove_silence")
             original_duration, trimmed_duration, edited_audio = await asyncio.to_thread(
-                remove_silence, edited_audio
+                remove_silence_step, edited_audio
             )
 
         # distribution stage
