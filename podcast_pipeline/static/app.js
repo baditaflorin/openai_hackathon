@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadingOverlay = document.getElementById('loading');
 
   const handleFile = async (file) => {
-    loadingOverlay.classList.add('show');
+    loadingOverlay.classList.remove('d-none');
+    loadingOverlay.classList.add('d-flex');
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -23,7 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
       document.close();
     } catch (err) {
       console.error(err);
-      loadingOverlay.classList.remove('show');
+      loadingOverlay.classList.remove('d-flex');
+      loadingOverlay.classList.add('d-none');
       alert(`Upload error: ${err}`);
     }
   };

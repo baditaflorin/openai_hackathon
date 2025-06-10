@@ -71,6 +71,21 @@ from podcast_pipeline.pipeline import run_pipeline
 outputs = run_pipeline()
 ```
 
+You can also access the scheduling utilities directly:
+
+```python
+from podcast_pipeline.services.scheduling import generate_dummy_schedule, propose_schedule_async
+from podcast_pipeline.utils.metadata import read_metadata
+
+records = read_metadata()
+# Synchronous dummy schedule (one episode per day)
+dummy_schedule = generate_dummy_schedule(records)
+
+import asyncio
+# Asynchronously propose schedule via the Scheduler Agent (fallback to dummy on error)
+schedules = asyncio.run(propose_schedule_async(records))
+```
+
 ### GUI
 
 You can also launch a very small Tkinter interface (requires installed Tcl/Tk support):
@@ -109,3 +124,13 @@ You can either drag-and-drop your audio file or click the "Or select file" butto
 - Processed files will appear in a list below the upload zone; click a filename to view its details.
 - On the episode detail page, you'll see 5 suggested titles—choose one as your favorite and save it for later use.
 - You can also delete old records (and their audio files) directly from the home page using the "Delete" button next to each processed file.
+
+### Scheduler
+
+A scheduling page is available at `/scheduler` to manually or automatically assign posting dates to your processed episodes:
+
+- Click the **Scheduler** button on the home page (or visit `/scheduler`) to view all episodes with their chosen title.
+- Use **Auto-Schedule All** to automatically propose posting dates based on your selected cadence (daily, weekly, or every N days). Make sure you've chosen a title for each unscheduled episode first.
+- Manually set each episode’s date/time and select **publish destinations** (YouTube, Spotify, Apple Podcasts) using the form controls, then click **Save**. You cannot schedule an episode until a title has been selected.
+
+- A loading spinner overlay will appear while scheduling operations are in progress, so you know when the page is working.

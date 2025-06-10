@@ -9,7 +9,10 @@
 </head>
 <body>
   <div class="container py-4">
-    <h1 class="mb-4">Podcast Pipeline</h1>
+    <div class="d-flex align-items-center mb-4">
+      <h1 class="me-auto">Podcast Pipeline</h1>
+      <a href="/scheduler" class="btn btn-outline-secondary">Scheduler</a>
+    </div>
 
     <div id="drop_zone" class="border border-secondary rounded p-4 text-center mb-4" style="border-style: dashed;">
       <p class="mb-2">Drop audio file here</p>
@@ -37,7 +40,7 @@
     {% endif %}
 
     <!-- Loading overlay shown while processing upload -->
-    <div id="loading" class="position-fixed w-100 h-100 top-0 start-0 d-none bg-white bg-opacity-75 d-flex justify-content-center align-items-center">
+  <div id="loading" class="position-fixed w-100 h-100 top-0 start-0 d-none bg-white bg-opacity-75 justify-content-center align-items-center">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
