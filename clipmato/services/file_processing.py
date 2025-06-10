@@ -15,7 +15,8 @@ from ..steps.distribution import distribute_async
 from ..utils.progress import update_progress
 from ..utils.metadata import append_metadata
 from ..steps.silence_removal import remove_silence as remove_silence_step
-from .service_utils import run_stage
+from typing import Any
+from ..orchestrator import Step, Pipeline
 
 async def process_file_async(
     file_path: str,
@@ -29,72 +30,103 @@ async def process_file_async(
     If record_id is provided, it will be used; otherwise a new UUID is generated.
     Progress is emitted via the progress status file at each stage.
     """
-    # determine or generate the record ID for status tracking
     rec_id = record_id or str(uuid4())
     logger = logging.getLogger(__name__)
     logger.info(f"[{rec_id}] Starting processing file {file_path}, remove_silence={remove_silence}")
 
-    try:
-        transcript = await run_stage(
-            rec_id,
+    context: dict[str, Any] = {
+        "rec_id": rec_id,
+        "file_path": file_path,
+        "filename": filename,
+    }
+
+    steps: list[Step] = [
+        Step(
             "transcribing",
             transcribe_audio,
-            file_path,
+            input_keys=["file_path"],
+            output_keys="transcript",
             to_thread=True,
             log_result=lambda r: f"{len(r)} characters",
-        )
-
-        desc = await run_stage(rec_id, "descriptions", generate_descriptions_async, transcript)
-        entities = await run_stage(rec_id, "entities", extract_entities_async, transcript)
-
-        titles = await run_stage(rec_id, "titles", propose_titles_async, transcript)
-        script = await run_stage(rec_id, "script", generate_script_async, transcript)
-
-        edited_audio = await run_stage(
-            rec_id,
+        ),
+        Step(
+            "descriptions",
+            generate_descriptions_async,
+            input_keys=["transcript"],
+            output_keys="desc",
+        ),
+        Step(
+            "entities",
+            extract_entities_async,
+            input_keys=["transcript"],
+            output_keys="entities",
+        ),
+        Step(
+            "titles",
+            propose_titles_async,
+            input_keys=["transcript"],
+            output_keys="titles",
+        ),
+        Step(
+            "script",
+            generate_script_async,
+            input_keys=["transcript"],
+            output_keys="script",
+        ),
+        Step(
             "editing",
             edit_audio_async,
-            file_path,
-            log_result=lambda path: f"output file: {path}",
-        )
-
-        # optional silence removal stage
-        original_duration = None
-        trimmed_duration = None
-        if remove_silence:
-            original_duration, trimmed_duration, edited_audio = await run_stage(
-                rec_id,
+            input_keys=["file_path"],
+            output_keys="edited_audio",
+            log_result=lambda p: f"output file: {p}",
+        ),
+    ]
+    if remove_silence:
+        steps.append(
+            Step(
                 "remove_silence",
                 remove_silence_step,
-                edited_audio,
+                input_keys=["edited_audio"],
+                output_keys=["original_duration", "trimmed_duration", "edited_audio"],
                 to_thread=True,
                 log_result=lambda res: f"original={res[0]:.2f}s trimmed={res[1]:.2f}s",
             )
+        )
+    steps.append(
+        Step(
+            "distribution",
+            distribute_async,
+            input_keys=["edited_audio"],
+            output_keys="distribution",
+        )
+    )
 
-        distribution = await run_stage(rec_id, "distribution", distribute_async, edited_audio)
+    try:
+        context = await Pipeline(steps).run(context)
 
-        # finalize and save metadata
-        record = {
+        desc = context["desc"]
+        entities = context["entities"]
+
+        record: dict[str, Any] = {
             "id": rec_id,
             "filename": filename,
             "upload_time": datetime.utcnow().isoformat(),
-            "transcript": transcript,
-            "titles": titles,
+            "transcript": context["transcript"],
+            "titles": context["titles"],
             "selected_title": None,
             "short_description": desc.get("short_description", ""),
             "long_description": desc.get("long_description", ""),
             "people": entities.get("people", []),
             "locations": entities.get("locations", []),
-            "script": script,
-            "edited_audio": edited_audio,
-            "distribution": distribution,
+            "script": context["script"],
+            "edited_audio": context["edited_audio"],
+            "distribution": context["distribution"],
         }
         if remove_silence:
-            record["original_duration"] = original_duration
-            record["trimmed_duration"] = trimmed_duration
-        append_metadata(record)
+            record["original_duration"] = context["original_duration"]
+            record["trimmed_duration"] = context["trimmed_duration"]
 
-        # complete
+        append_metadata(record)
         update_progress(rec_id, "complete")
         return record
     except Exception as exc:
