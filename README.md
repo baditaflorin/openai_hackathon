@@ -1,6 +1,6 @@
-# Automated Podcast Production Pipeline
+# Clipmato
 
-This repository contains a minimal prototype of a podcast production pipeline built with the OpenAI Agents SDK.
+This repository contains a minimal prototype of Clipmato—an automated production pipeline built with the OpenAI Agents SDK.
 
 ## Components
 - **Content Curator Agent** – Suggests topics and guests.
@@ -32,7 +32,7 @@ sudo apt-get install ffmpeg
 Install dependencies and run the example pipeline:
 ```bash
 pip install -r requirements.txt
-python -m podcast_pipeline.pipeline
+python -m clipmato.pipeline
 ```
 > **Note:** We include `simpleaudio` in `requirements.txt` to satisfy pydub’s audio-operation needs.
 > Also ensure your Python build provides the standard `audioop` extension (or install a `pyaudioop` fallback) so that pydub silence removal will work without errors.
@@ -41,7 +41,7 @@ python -m podcast_pipeline.pipeline
 
 You can also import and run individual pipeline steps (including transcription and title suggestions):
 ```python
-from podcast_pipeline.steps import (
+from clipmato.steps import (
     transcribe_audio,
     propose_titles,
     curate_content,
@@ -68,7 +68,7 @@ distribution = distribute(edited_audio)
 
 Or run the full pipeline programmatically:
 ```python
-from podcast_pipeline.pipeline import run_pipeline
+from clipmato.pipeline import run_pipeline
 
 outputs = run_pipeline()
 ```
@@ -76,8 +76,8 @@ outputs = run_pipeline()
 You can also access the scheduling utilities directly:
 
 ```python
-from podcast_pipeline.services.scheduling import generate_dummy_schedule, propose_schedule_async
-from podcast_pipeline.utils.metadata import read_metadata
+from clipmato.services.scheduling import generate_dummy_schedule, propose_schedule_async
+from clipmato.utils.metadata import read_metadata
 
 records = read_metadata()
 # Synchronous dummy schedule (one episode per day)
@@ -93,7 +93,7 @@ schedules = asyncio.run(propose_schedule_async(records))
 You can also launch a very small Tkinter interface (requires installed Tcl/Tk support):
 
 ```bash
-python -m podcast_pipeline.gui
+python -m clipmato.gui
 ```
 
 > **macOS**: If you get `ModuleNotFoundError: No module named '_tkinter'`, install Tcl/Tk and reinstall Python from python.org or via Homebrew:
@@ -115,7 +115,7 @@ You can also run a FastAPI-based web interface for drag-and-drop file upload and
 
 ```bash
 pip install -r requirements.txt
-uvicorn podcast_pipeline.web:app --reload
+uvicorn clipmato.web:app --reload
 ```
 
 Then visit `http://127.0.0.1:8000/` in your browser.

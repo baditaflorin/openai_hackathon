@@ -18,7 +18,7 @@ def run():
         text.insert(tk.END, f"{key}: {value}\n\n")
 
 root = tk.Tk()
-root.title("Podcast Pipeline")
+root.title("Clipmato")
 
 run_button = tk.Button(root, text="Run Pipeline", command=run)
 run_button.pack(pady=10)
