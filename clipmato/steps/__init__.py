@@ -1,11 +1,24 @@
 """
-Clipmato pipeline steps: content curation, script generation, audio editing,
-distribution, title suggestion, description generation, entity extraction,
-silence removal, and transcription.
+Clipmato pipeline steps with plugin support.
+
+Drop a new module in this directory defining step functions,
+and they will be auto-discovered.
 """
-from .content_curation import curate_content, curate_content_async
-from .script_generation import generate_script, generate_script_async
-from .audio_editing import edit_audio, edit_audio_async
-from .distribution import distribute, distribute_async
-from .title_suggestion import propose_titles, propose_titles_async
-from .transcription import transcribe_audio
+import pkgutil
+import importlib
+
+__all__ = []
+
+_SKIP_MODULES = {"step_utils"}
+
+for _finder, module_name, _ispkg in pkgutil.iter_modules(__path__):
+    if module_name in _SKIP_MODULES or module_name.startswith("_"):
+        continue
+    module = importlib.import_module(f"{__name__}.{module_name}")
+    for attr in dir(module):
+        if attr.startswith("_"):
+            continue
+        obj = getattr(module, attr)
+        if callable(obj) and getattr(obj, "__module__", None) == module.__name__:
+            globals()[attr] = obj
+            __all__.append(attr)

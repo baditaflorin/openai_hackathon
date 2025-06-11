@@ -88,6 +88,74 @@ import asyncio
 schedules = asyncio.run(propose_schedule_async(records))
 ```
 
+### Plugin Infrastructure
+
+Clipmato supports a plugin mechanism for both agents and pipeline steps.
+Simply drop a new Python module into the `clipmato/agents` or `clipmato/steps`
+directory, and Clipmato will automatically discover and load your plugin.
+
+#### Agents
+
+To define a new agent, create a file in `clipmato/agents` and define an
+`Agent` instance with a variable name ending in `_agent`. For example:
+
+```python
+# clipmato/agents/my_custom_agent.py
+from agents import Agent
+
+my_custom_agent = Agent(
+    name="My Custom Agent",
+    instructions="""
+    Your instructions here...
+    """
+)
+```
+
+Clipmato will register `my_custom_agent`, and you can retrieve it at runtime:
+
+```python
+from clipmato.agents import list_agents, get_agent
+
+agents = list_agents()
+agent = get_agent("My Custom Agent")
+```
+
+#### Steps
+
+To define a new pipeline step, create a file in `clipmato/steps` and define
+callable functions. For example:
+
+```python
+# clipmato/steps/my_step.py
+
+def my_step(input_data: str) -> str:
+    # perform processing...
+    return result
+```
+
+Your step function will be available through the `clipmato.steps` namespace:
+
+```python
+from clipmato.steps import my_step
+```
+
+#### Routers
+
+To define a new set of web endpoints, create a file in `clipmato/routers`
+and define an `APIRouter` instance named `router`. Clipmato will auto-discover
+your router and include it in the FastAPI app. For example:
+
+```python
+# clipmato/routers/my_feature.py
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/my_feature")
+
+@router.get("/")
+async def read_my_feature():
+    return {"message": "Hello from my feature"}
+```
+
 ### GUI
 
 You can also launch a very small Tkinter interface (requires installed Tcl/Tk support):
