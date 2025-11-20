@@ -16,6 +16,18 @@ STATIC_DIR = BASE_DIR / "static"
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 METADATA_PATH = UPLOAD_DIR / "metadata.json"
+ALLOWED_UPLOAD_MIME_TYPES: set[str] = {
+    "audio/flac",
+    "audio/m4a",
+    "audio/mp4",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/opus",
+    "audio/wav",
+    "audio/webm",
+    "audio/x-wav",
+}
+MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024  # 50MB limit for uploads
 
 # Mapping of pipeline stages to progress percentages
 STAGE_PROGRESS: dict[str, int] = {

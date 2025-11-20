@@ -1,16 +1,25 @@
 """
 Routes for handling file uploads and rendering upload/index pages.
 """
-from fastapi import APIRouter, File, UploadFile, Request, Form, BackgroundTasks, Depends
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import HTMLResponse, JSONResponse
 from uuid import uuid4
 
 from ..dependencies import (
-    get_templates,
     get_file_io_service,
-    get_processing_service,
     get_metadata_service,
+    get_processing_service,
     get_progress_service,
+    get_templates,
 )
 
 router = APIRouter()
@@ -40,7 +49,13 @@ async def upload(
     progress_svc=Depends(get_progress_service),
 ) -> JSONResponse:
     """Handle uploaded file: save it, enqueue processing, and return a job ID."""
-    file_path = file_io.save(file)
+    try:
+        file_path = file_io.save(file)
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive path
+        raise HTTPException(status_code=500, detail="Failed to store uploaded file") from exc
+
     record_id = str(uuid4())
     # mark the pipeline as starting (after upload)
     progress_svc.update(record_id, "transcribing")
