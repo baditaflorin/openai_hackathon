@@ -15,6 +15,7 @@ from ..config import METADATA_PATH
 
 
 metadata_path = METADATA_PATH
+metadata_lock_path = metadata_path.with_suffix(f"{metadata_path.suffix}.lock")
 logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
 
@@ -22,24 +23,21 @@ _T = TypeVar("_T")
 @contextmanager
 def _locked_metadata_file():
     """Yield a locked file handle for metadata operations."""
-    metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    with metadata_path.open("a+", encoding="utf-8") as handle:
+    metadata_lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with metadata_lock_path.open("a+", encoding="utf-8") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
-        handle.seek(0)
         try:
             yield handle
         finally:
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def _read_records_from_handle(handle) -> list[dict]:
-    handle.seek(0)
-    raw = handle.read().strip()
-    if not raw:
+def _read_records_unlocked() -> list[dict]:
+    if not metadata_path.exists():
         return []
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
         logger.exception("Failed to decode metadata; treating it as empty")
         return []
 
@@ -79,7 +77,8 @@ def mutate_metadata(mutator: Callable[[list[dict]], _T]) -> _T:
     """Apply a read-modify-write mutation to metadata under a process lock."""
     try:
         with _locked_metadata_file() as handle:
-            records = _read_records_from_handle(handle)
+            _ = handle  # lock lifetime only
+            records = _read_records_unlocked()
             result = mutator(records)
             _atomic_write_records(records)
             return copy.deepcopy(result)
