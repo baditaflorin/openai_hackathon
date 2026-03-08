@@ -2,20 +2,32 @@
 Configuration constants for Clipmato: template paths, static files,
 uploads directory, metadata file, progress mapping, and default parameters.
 """
+import os
 from pathlib import Path
 
+from fastapi.templating import Jinja2Templates
+
 # Base directory of the Clipmato package
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR_ENV_VAR = "CLIPMATO_DATA_DIR"
+DEFAULT_DATA_DIR = (
+    BASE_DIR / "uploads" if (BASE_DIR / "uploads").exists() else Path.home() / ".clipmato"
+)
 
 # Templates and static files
-from fastapi.templating import Jinja2Templates
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 STATIC_DIR = BASE_DIR / "static"
 
-# Uploads and metadata paths
-UPLOAD_DIR = BASE_DIR / "uploads"
+# Uploads and metadata paths. Runtime data can live outside the package so
+# packaged installs and containers can persist uploads in a writable volume.
+UPLOAD_DIR = Path(os.getenv(DATA_DIR_ENV_VAR, str(DEFAULT_DATA_DIR))).expanduser()
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 METADATA_PATH = UPLOAD_DIR / "metadata.json"
+PROVIDERS_DIR = UPLOAD_DIR / "providers"
+PROVIDERS_DIR.mkdir(parents=True, exist_ok=True)
+PROMPT_RUNS_PATH = UPLOAD_DIR / "prompt_runs.jsonl"
+PROMPT_EVALUATIONS_PATH = UPLOAD_DIR / "prompt_evaluations.jsonl"
+
 ALLOWED_UPLOAD_MIME_TYPES: set[str] = {
     "audio/flac",
     "audio/m4a",
@@ -54,6 +66,10 @@ MAX_CHUNK_SIZE_BYTES = 25 * 1024 * 1024  # 25MB limit for Whisper API
 FFMPEG_AUDIO_CODEC = "pcm_s16le"
 FFMPEG_SAMPLE_RATE = 16000
 FFMPEG_CHANNELS = 1
+TRANSCRIPTION_BACKEND_ENV_VAR = "CLIPMATO_TRANSCRIPTION_BACKEND"
+CONTENT_BACKEND_ENV_VAR = "CLIPMATO_CONTENT_BACKEND"
+LOCAL_WHISPER_MODEL = os.getenv("CLIPMATO_LOCAL_WHISPER_MODEL", "base").strip() or "base"
+LOCAL_WHISPER_DEVICE_ENV_VAR = "CLIPMATO_LOCAL_WHISPER_DEVICE"
 
 # Scheduling defaults
 DEFAULT_CADENCE = "daily"
@@ -62,3 +78,17 @@ CADENCE_INTERVALS: dict[str, dict[str, int]] = {
     "weekly": {"weeks": 1},
 }
 DEFAULT_PUBLISH_HOUR = 9
+
+# Publishing runtime configuration
+PUBLIC_BASE_URL = os.getenv("CLIPMATO_BASE_URL", "").strip().rstrip("/")
+PUBLISH_POLL_SECONDS = max(int(os.getenv("CLIPMATO_PUBLISH_POLL_SECONDS", "15")), 5)
+PUBLISH_MAX_ATTEMPTS = max(int(os.getenv("CLIPMATO_PUBLISH_MAX_ATTEMPTS", "3")), 1)
+PUBLISH_RETRY_SECONDS = max(int(os.getenv("CLIPMATO_PUBLISH_RETRY_SECONDS", "300")), 30)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+YOUTUBE_DEFAULT_PRIVACY_STATUS = (
+    os.getenv("CLIPMATO_YOUTUBE_PRIVACY_STATUS", "private").strip().lower() or "private"
+)
+YOUTUBE_TOKEN_PATH = PROVIDERS_DIR / "youtube_token.json"
+YOUTUBE_PROFILE_PATH = PROVIDERS_DIR / "youtube_profile.json"
+YOUTUBE_OAUTH_STATE_PATH = PROVIDERS_DIR / "youtube_oauth_state.json"

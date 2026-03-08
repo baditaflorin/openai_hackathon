@@ -1,9 +1,9 @@
 from agents import Agent
+from ..prompts.registry import resolve_prompt_version
+
+_prompt_version = resolve_prompt_version("script_generation")
 
 script_writer_agent = Agent(
-    name="Script Writer",
-    instructions="""
-You create concise show notes and interview questions for the provided topic.
-Return a short paragraph and three questions.
-""",
+    name=_prompt_version.label,
+    instructions=_prompt_version.system_instructions,
 )

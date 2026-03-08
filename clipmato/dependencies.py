@@ -8,12 +8,14 @@ from fastapi.templating import Jinja2Templates
 
 from .config import TEMPLATES, UPLOAD_DIR
 from .utils.file_io import save_upload_file
-from .utils.metadata import read_metadata, update_metadata, remove_metadata
+from .utils.metadata import get_metadata_record, read_metadata, update_metadata, remove_metadata
 from .utils.progress import update_progress, read_progress, enrich_with_progress
 from .services.file_processing import process_file_async
+from .services.publishing import PublishingService
 from .services.scheduling import propose_schedule_async
 
 logger = logging.getLogger(__name__)
+publishing_service = PublishingService()
 
 
 class FileIOService:
@@ -31,6 +33,9 @@ class MetadataService:
 
     def read(self):
         return read_metadata()
+
+    def get(self, record_id: str):
+        return get_metadata_record(record_id)
 
     def update(self, record_id: str, data: dict):
         return update_metadata(record_id, data)
@@ -94,3 +99,8 @@ def get_processing_service() -> ProcessingService:
 def get_scheduling_service() -> SchedulingService:
     """Dependency: Scheduling service instance."""
     return SchedulingService()
+
+
+def get_publishing_service() -> PublishingService:
+    """Dependency: Publishing service singleton."""
+    return publishing_service

@@ -1,0 +1,32 @@
+{
+  "task": "title_suggestion",
+  "label": "Title Suggestion",
+  "owner": "clipmato",
+  "default_version": "v1",
+  "versions": [
+    {
+      "version": "v1",
+      "status": "active",
+      "created_at": "2026-03-08",
+      "system_instructions": "You suggest 5 catchy and descriptive podcast episode titles based on the provided transcript. Respond ONLY with a JSON array of strings. Do not include any other text or explanations.",
+      "user_template": "Transcript:\n{transcript}",
+      "output_contract": {
+        "type": "json_list",
+        "count": 5,
+        "max_item_length": 90
+      }
+    },
+    {
+      "version": "v1-format-tight",
+      "status": "experimental",
+      "created_at": "2026-03-08",
+      "system_instructions": "You write exactly 5 podcast episode titles. Each title must be specific, natural, and publication-ready. Avoid clickbait cliches, numbering, labels, quotation marks, and surrounding commentary. Respond ONLY with a JSON array of 5 strings.",
+      "user_template": "Transcript:\n{transcript}",
+      "output_contract": {
+        "type": "json_list",
+        "count": 5,
+        "max_item_length": 90
+      }
+    }
+  ]
+}

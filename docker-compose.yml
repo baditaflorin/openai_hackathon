@@ -1,0 +1,27 @@
+services:
+  clipmato:
+    build:
+      context: .
+    image: clipmato:0.2.0
+    ports:
+      - "${CLIPMATO_PORT:-8000}:8000"
+    environment:
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      CLIPMATO_DATA_DIR: /data
+      CLIPMATO_TRANSCRIPTION_BACKEND: "${CLIPMATO_TRANSCRIPTION_BACKEND:-openai}"
+      CLIPMATO_CONTENT_BACKEND: "${CLIPMATO_CONTENT_BACKEND:-auto}"
+      CLIPMATO_BASE_URL: "${CLIPMATO_BASE_URL:-http://localhost:8000}"
+      CLIPMATO_PUBLISH_POLL_SECONDS: "${CLIPMATO_PUBLISH_POLL_SECONDS:-15}"
+      CLIPMATO_PUBLISH_MAX_ATTEMPTS: "${CLIPMATO_PUBLISH_MAX_ATTEMPTS:-3}"
+      CLIPMATO_PUBLISH_RETRY_SECONDS: "${CLIPMATO_PUBLISH_RETRY_SECONDS:-300}"
+      CLIPMATO_YOUTUBE_PRIVACY_STATUS: "${CLIPMATO_YOUTUBE_PRIVACY_STATUS:-private}"
+      CLIPMATO_HOST: 0.0.0.0
+      CLIPMATO_PORT: 8000
+    volumes:
+      - clipmato_data:/data
+    restart: unless-stopped
+
+volumes:
+  clipmato_data:

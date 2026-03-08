@@ -1,154 +1,240 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Clipmato - Scheduler</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/style.css" rel="stylesheet">
-</head>
-<body>
-  <nav class="navbar navbar-light bg-white shadow-sm mb-4">
-    <div class="container">
-      <a class="navbar-brand fw-semibold" href="/">Clipmato</a>
-    </div>
-  </nav>
-  <div class="container pb-4">
-    <h1 class="mb-4">Episode Scheduler</h1>
+{% extends "base.html" %}
 
-    <h2>Publication Calendar</h2>
-    <table class="table table-bordered text-center mb-4">
-      <thead>
-        <tr><th colspan="7">{{ month_name }} {{ year }}</th></tr>
-        <tr>
-          {% for d in ['Su','Mo','Tu','We','Th','Fr','Sa'] %}
-          <th>{{ d }}</th>
-          {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-      {% for week in calendar %}
-      <tr>
-        {% for day in week %}
-        <td>
-          {% if day %}
-          <div><strong>{{ day }}</strong></div>
-          {% for ev in events if ev.day == day %}
-          <div class="small mt-1">
-            {{ ev.time }}<br>{{ ev.title }}
-          </div>
-          {% endfor %}
-          {% endif %}
-        </td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <div class="mb-3">
-      <form method="post" action="/scheduler/auto" class="row g-2 align-items-center" \
-            onsubmit="document.getElementById('sched-loading').classList.remove('d-none')">
-        <div class="col-auto">
-          <label for="cadence" class="col-form-label">Cadence:</label>
+{% block title %}Clipmato - Schedule And Publish{% endblock %}
+
+{% block page_eyebrow %}<p class="page-eyebrow">Schedule + publish</p>{% endblock %}
+
+{% block page_title %}Plan the release calendar and keep publishing visible{% endblock %}
+
+{% block page_intro %}
+<p class="page-intro">
+  The scheduler is now part calendar, part publishing control plane. YouTube is live today, while Spotify and Apple Podcast targets remain stored for future providers.
+</p>
+{% endblock %}
+
+{% block hero_aside %}
+<aside class="hero-panel" id="publish-board">
+  <p class="hero-panel__eyebrow">YouTube connection</p>
+  <div class="hero-panel__stack">
+    <div>
+      <span>Status</span>
+      <strong>
+        {% if youtube_status.available and youtube_status.connected %}
+        Connected
+        {% elif youtube_status.available %}
+        Needs connection
+        {% else %}
+        Not configured
+        {% endif %}
+      </strong>
+    </div>
+    {% if youtube_status.channel_title %}
+    <div>
+      <span>Channel</span>
+      <strong>{{ youtube_status.channel_title }}</strong>
+    </div>
+    {% endif %}
+    {% if youtube_status.redirect_uri %}
+    <div>
+      <span>Redirect URI</span>
+      <strong class="hero-panel__mono">{{ youtube_status.redirect_uri }}</strong>
+    </div>
+    {% endif %}
+  </div>
+  {% if youtube_status.message %}
+  <p class="hero-panel__note">{{ youtube_status.message }}</p>
+  {% endif %}
+  <div class="action-row">
+    {% if youtube_status.available and youtube_status.connected %}
+    <form method="post" action="/auth/youtube/disconnect" data-busy-form="true">
+      <button type="submit" class="btn btn-outline-secondary btn-sm" data-busy-label="Disconnecting...">Disconnect</button>
+    </form>
+    {% elif youtube_status.available %}
+    <a href="/auth/youtube/connect" class="btn btn-primary btn-sm">Connect YouTube</a>
+    {% endif %}
+  </div>
+</aside>
+{% endblock %}
+
+{% block content %}
+  {% if scheduler_notice %}
+  <section class="workflow-surface alert-surface is-success" role="status">
+    <h2 class="section-title">Update</h2>
+    <p class="mb-0">{{ scheduler_notice }}</p>
+  </section>
+  {% endif %}
+  {% if scheduler_error %}
+  <section class="workflow-surface alert-surface is-danger" role="alert">
+    <h2 class="section-title">Scheduler error</h2>
+    <p class="mb-0">{{ scheduler_error }}</p>
+  </section>
+  {% endif %}
+
+  <section class="workflow-grid workflow-grid--calendar">
+    <section class="workflow-surface">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Calendar</p>
+          <h2 class="section-title">Publication calendar</h2>
         </div>
-        <div class="col-auto">
-          <select name="cadence" id="cadence" class="form-select form-select-sm">
+        <p class="section-copy">Use this as the shared view of what is going live this month.</p>
+      </div>
+      <table class="calendar-table">
+        <thead>
+          <tr>
+            <th colspan="7">{{ month_name }} {{ year }}</th>
+          </tr>
+          <tr>
+            {% for d in ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] %}
+            <th>{{ d }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for week in calendar %}
+          <tr>
+            {% for day in week %}
+            <td>
+              {% if day %}
+              <div class="calendar-table__day">{{ day }}</div>
+              {% for ev in events if ev.day == day %}
+              <div class="calendar-event">
+                <strong>{{ ev.time }}</strong>
+                <span>{{ ev.title }}</span>
+              </div>
+              {% endfor %}
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="workflow-surface">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Automation</p>
+          <h2 class="section-title">Auto-schedule the backlog</h2>
+        </div>
+      </div>
+      <form method="post" action="/scheduler/auto" class="stack-form" data-busy-form="true">
+        <div class="form-cluster">
+          <label for="cadence" class="form-label">Cadence</label>
+          <select name="cadence" id="cadence" class="form-select">
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="every_n">Every N days</option>
           </select>
         </div>
-        <div class="col-auto d-none" id="n-days-group">
-          <input type="number" name="n_days" id="n-days" class="form-control form-control-sm" placeholder="N days">
+        <div class="form-cluster is-hidden" id="n-days-group">
+          <label for="n-days" class="form-label">Every N days</label>
+          <input type="number" name="n_days" id="n-days" class="form-control" placeholder="3">
         </div>
-        <div class="col-auto">
-          <button type="submit" class="btn btn-primary btn-sm">Auto-Schedule All</button>
-        </div>
+        <button type="submit" class="btn btn-primary" data-busy-label="Scheduling...">Auto-schedule all</button>
       </form>
+    </section>
+  </section>
+
+  <section class="workflow-surface">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Board</p>
+        <h2 class="section-title">Schedule and publish board</h2>
+      </div>
+      <p class="section-copy">Each card keeps the release time, target selection, provider status, and next action together.</p>
     </div>
     {% if not records %}
-    <p>No episodes have been processed yet.</p>
-    {% else %}
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>Filename</th>
-          <th>Title</th>
-          <th>Publish &amp; Schedule</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for rec in records %}
-        <tr>
-          <td><a href="/record/{{ rec.id }}">{{ rec.filename }}</a></td>
-          <td>{{ rec.selected_title or '-' }}</td>
-          <td>
-            {% if rec.selected_title %}
-            <form method="post" action="/record/{{ rec.id }}/schedule" \
-                  onsubmit="document.getElementById('sched-loading').classList.remove('d-none')">
-              <div class="mb-1">
-                <label class="form-label me-2">Publish to:</label>
-                {% for target in ['YouTube', 'Spotify', 'Apple Podcasts'] %}
-                <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="checkbox" name="publish_targets" value="{{ target }}"
-                         id="pt-{{ target|lower|replace(' ', '-') }}-{{ rec.id }}"
-                         {% if rec.publish_targets and target in rec.publish_targets %}checked{% endif %}>
-                  <label class="form-check-label" for="pt-{{ target|lower|replace(' ', '-') }}-{{ rec.id }}">{{ target }}</label>
-                </div>
-                {% endfor %}
-              </div>
-              <div class="input-group input-group-sm">
-                <input type="datetime-local" name="schedule_time" class="form-control"
-                       value="{{ rec.schedule_time[:16] if rec.schedule_time }}" required>
-                <button type="submit" class="btn btn-success">Save</button>
-              </div>
-            </form>
-            {% else %}
-            <span class="text-muted">Select title first</span>
-            {% endif %}
-          </td>
-          <td>
-            <form method="post" action="/record/{{ rec.id }}/delete" onsubmit="return confirm('Delete this record and file?');">
-              <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-    <a href="/" class="btn btn-secondary">Back to Home</a>
-
-  <!-- Loading overlay shown while auto-scheduling or manual schedule -->
-  <div id="sched-loading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center bg-white bg-opacity-75">
-    <div class="spinner-border text-primary" style="width:4rem; height:4rem;" role="status">
-      <span class="visually-hidden">Scheduling…</span>
+    <div class="empty-state">
+      <h3>No episodes ready for scheduling</h3>
+      <p>Upload and process an episode first, then it will appear in this board.</p>
     </div>
-  </div>
-  </div>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    // Toggle N-days input when cadence == 'every_n'
-    const cadenceSelect = document.getElementById('cadence');
-    const nDaysGroup = document.getElementById('n-days-group');
-    const nDaysInput = document.getElementById('n-days');
-    function toggleNDays() {
-      if (cadenceSelect.value === 'every_n') {
-        nDaysGroup.classList.remove('d-none');
-        nDaysInput.disabled = false;
-        nDaysInput.required = true;
-      } else {
-        nDaysGroup.classList.add('d-none');
-        nDaysInput.disabled = true;
-        nDaysInput.required = false;
-        nDaysInput.value = '';
-      }
-    }
-    cadenceSelect.addEventListener('change', toggleNDays);
-    // initialize state on page load
-    toggleNDays();
-  </script>
-</body>
-</html>
+    {% else %}
+    <div class="schedule-board">
+      {% for rec in records %}
+      <article class="schedule-card">
+        <div class="schedule-card__header">
+          <div>
+            <p class="schedule-card__eyebrow">{{ rec.filename }}</p>
+            <h3 class="schedule-card__title">{{ rec.selected_title or 'Choose a title first' }}</h3>
+          </div>
+          {% if rec.youtube_job %}
+          <span class="status-pill {% if rec.youtube_job.status == 'published' %}is-success{% elif rec.youtube_job.status in ['scheduled', 'publishing'] %}is-brand{% elif rec.youtube_job.status in ['blocked', 'failed'] %}is-danger{% else %}is-muted{% endif %}">
+            {{ rec.youtube_job.status | replace('_', ' ') | title }}
+          </span>
+          {% endif %}
+        </div>
+        <p class="schedule-card__meta"><a href="/record/{{ rec.id }}">Open episode record</a></p>
+
+        {% if rec.selected_title %}
+        <form method="post" action="/record/{{ rec.id }}/schedule" class="stack-form" data-busy-form="true">
+          <div class="target-grid">
+            {% for target in ['YouTube', 'Spotify', 'Apple Podcasts'] %}
+            <label class="choice-card choice-card--compact">
+              <input class="form-check-input" type="checkbox" name="publish_targets" value="{{ target }}" {% if rec.publish_targets and target in rec.publish_targets %}checked{% endif %}>
+              <span>{{ target }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div class="form-cluster">
+            <label class="form-label" for="schedule-{{ rec.id }}">Release time</label>
+            <input id="schedule-{{ rec.id }}" type="datetime-local" name="schedule_time" class="form-control" value="{{ rec.schedule_time[:16] if rec.schedule_time }}" required>
+          </div>
+          <div class="form-cluster">
+            {% set selected_privacy = rec.youtube_job.privacy_status if rec.youtube_job else default_youtube_privacy_status %}
+            <label class="form-label" for="privacy-{{ rec.id }}">YouTube privacy</label>
+            <select id="privacy-{{ rec.id }}" name="youtube_privacy_status" class="form-select">
+              <option value="private" {% if selected_privacy == 'private' %}selected{% endif %}>Private</option>
+              <option value="unlisted" {% if selected_privacy == 'unlisted' %}selected{% endif %}>Unlisted</option>
+              <option value="public" {% if selected_privacy == 'public' %}selected{% endif %}>Public</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm" data-busy-label="Saving...">Save schedule</button>
+        </form>
+        {% else %}
+        <div class="empty-inline">
+          <p>Select a title on the record page before scheduling this episode.</p>
+        </div>
+        {% endif %}
+
+        <div class="status-card">
+          {% if rec.youtube_job %}
+          {% if rec.youtube_job.scheduled_for %}
+          <p class="status-card__copy">Target release: {{ rec.youtube_job.scheduled_for }}</p>
+          {% endif %}
+          {% if rec.youtube_job.published_at %}
+          <p class="status-card__copy">Published: {{ rec.youtube_job.published_at }}</p>
+          {% endif %}
+          {% if rec.youtube_job.last_error %}
+          <p class="status-card__copy is-danger">{{ rec.youtube_job.last_error }}</p>
+          {% endif %}
+          {% if rec.youtube_job.remote_url %}
+          <p class="status-card__copy"><a href="{{ rec.youtube_job.remote_url }}" target="_blank" rel="noreferrer">Open live video</a></p>
+          {% endif %}
+          {% else %}
+          <p class="status-card__copy">Select YouTube to create a provider-backed publish job.</p>
+          {% endif %}
+        </div>
+
+        <div class="action-row">
+          {% if rec.selected_title and (not rec.youtube_job or rec.youtube_job.status not in ['published', 'publishing']) %}
+          <form method="post" action="/record/{{ rec.id }}/publish/youtube/now" data-busy-form="true">
+            <button type="submit" class="btn btn-outline-primary btn-sm" data-busy-label="Queueing...">Publish now</button>
+          </form>
+          {% endif %}
+          {% if rec.youtube_job and rec.youtube_job.status in ['failed', 'blocked', 'pending_connection', 'cancelled'] %}
+          <form method="post" action="/record/{{ rec.id }}/publish/youtube/retry" data-busy-form="true">
+            <button type="submit" class="btn btn-outline-secondary btn-sm" data-busy-label="Retrying...">Retry</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/record/{{ rec.id }}/delete" data-busy-form="true" data-confirm-message="Remove this record and its media file?">
+            <button type="submit" class="btn btn-outline-secondary btn-sm" data-busy-label="Removing...">Remove</button>
+          </form>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+{% endblock %}

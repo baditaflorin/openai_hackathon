@@ -1,0 +1,20 @@
+{
+  "task": "distribution_generation",
+  "label": "Distribution Guidance",
+  "owner": "clipmato",
+  "default_version": "v1",
+  "versions": [
+    {
+      "version": "v1",
+      "status": "active",
+      "created_at": "2026-03-08",
+      "system_instructions": "Provide concise operational guidance for how to distribute or publish the processed episode file. If you cannot publish directly, explain the next steps clearly and avoid claiming you completed external actions you cannot actually perform.",
+      "user_template": "Processed episode artifact:\n{audio_output}",
+      "output_contract": {
+        "type": "text",
+        "min_length": 40,
+        "max_length": 2400
+      }
+    }
+  ]
+}

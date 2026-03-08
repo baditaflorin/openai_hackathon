@@ -1,76 +1,127 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clipmato AI</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/style.css" rel="stylesheet">
-</head>
-<body>
-  <nav class="navbar navbar-light bg-white shadow-sm mb-4">
-    <div class="container">
-      <a class="navbar-brand fw-semibold" href="/">Clipmato AI</a>
-      <a href="/scheduler" class="btn btn-outline-primary">Scheduler</a>
-    </div>
-  </nav>
-  <div class="container pb-4">
+{% extends "base.html" %}
 
-    <div id="drop_zone" class="border border-secondary rounded p-4 text-center mb-4" style="border-style: dashed;">
-      <p class="mb-2">Drop video or audio file here</p>
-      <button id="file_select_btn" class="btn btn-primary">Select a video or audio file</button>
-      <input type="file" id="file_input" style="display: none;">
-    </div>
-    <div class="form-check mb-4">
-      <input class="form-check-input" type="checkbox" id="remove_silence_checkbox">
-      <label class="form-check-label" for="remove_silence_checkbox">Remove silence</label>
-    </div>
+{% block title %}Clipmato - Capture And Library{% endblock %}
 
-    <div id="record_controls" class="text-center mb-4">
-      <button id="record_screen_btn" class="btn btn-success me-2">Record Screen</button>
-      <button id="record_webcam_btn" class="btn btn-success me-2">Record Webcam</button>
-      <button id="record_both_btn" class="btn btn-success">Record Screen + Webcam</button>
-    </div>
+{% block page_eyebrow %}<p class="page-eyebrow">Capture workspace</p>{% endblock %}
 
-    <div class="mb-5">
-      <h2>Episode Dashboard</h2>
-      <div id="records_container" class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
-        {% for rec in records %}
-        <div class="col" id="rec_{{ rec.id }}">
-          <div class="card h-100">
-            <div class="card-body d-flex flex-column">
-              <h5 class="card-title">{{ rec.selected_title or rec.filename }}</h5>
-              <p class="card-text text-muted mb-1">{{ rec.upload_time }}</p>
-              {% if rec.progress < 100 %}
-                {% if rec.stage == 'error' %}
-                  <span class="badge bg-danger mb-2">Error: {{ rec.message or rec.error }}</span>
-                {% else %}
-                  <span class="badge bg-info mb-2">{{ rec.stage.replace('_', ' ').capitalize() }} ({{ rec.progress }}%)</span>
-                  <div class="progress mb-2">
-                    <div class="progress-bar" role="progressbar" style="width: {{ rec.progress }}%;" aria-valuenow="{{ rec.progress }}" aria-valuemin="0" aria-valuemax="100">{{ rec.progress }}%</div>
-                  </div>
-                {% endif %}
-              {% endif %}
-              <div class="mt-auto">
-                {% if rec.progress >= 100 and not rec.error %}
-                  <a href="/record/{{ rec.id }}" class="btn btn-primary btn-sm me-2">Details</a>
-                {% endif %}
-                <form method="post" action="/record/{{ rec.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this record and file?');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                </form>
-              </div>
-            </div>
+{% block page_title %}Turn raw clips into scheduled episodes without losing the thread{% endblock %}
+
+{% block page_intro %}
+<p class="page-intro">
+  Upload or record once, then keep moving through transcript generation, title selection, scheduling, and publishing from a single workflow.
+</p>
+{% endblock %}
+
+{% block hero_aside %}
+<aside class="hero-panel">
+  <p class="hero-panel__eyebrow">Runtime snapshot</p>
+  <div class="hero-panel__grid">
+    <div>
+      <span>Transcription</span>
+      <strong>{{ runtime_status.transcription_backend }}</strong>
+      {% if runtime_status.transcription_backend == 'local-whisper' %}
+      <small>device: {{ runtime_status.local_whisper_device }}</small>
+      {% endif %}
+    </div>
+    <div>
+      <span>Content</span>
+      <strong>{{ runtime_status.content_backend }}</strong>
+    </div>
+    <div>
+      <span>OpenAI key</span>
+      <strong>{{ 'configured' if runtime_status.openai_api_key_configured else 'missing' }}</strong>
+    </div>
+    <div>
+      <span>Scheduler</span>
+      <strong>{{ workflow_metrics.scheduled }}</strong>
+    </div>
+  </div>
+</aside>
+{% endblock %}
+
+{% block content %}
+  {% if runtime_status.blockers %}
+  <section class="workflow-surface alert-surface is-danger" role="alert">
+    <h2 class="section-title">Configuration blocker</h2>
+    <p class="mb-0">{{ runtime_status.blockers[0] }}</p>
+  </section>
+  {% endif %}
+
+  {% for warning in runtime_status.warnings %}
+  <section class="workflow-surface alert-surface is-warning" role="status">
+    <h2 class="section-title">Runtime note</h2>
+    <p class="mb-0">{{ warning }}</p>
+  </section>
+  {% endfor %}
+
+  <section id="capture" class="workflow-surface workflow-surface--capture">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Stage 1</p>
+        <h2 class="section-title">Capture or upload source material</h2>
+      </div>
+      <p class="section-copy">Drop a file, pick one manually, or record directly from the browser. New jobs appear immediately in the queue below.</p>
+    </div>
+    <div class="capture-layout">
+      <div class="capture-panel">
+        <div id="drop_zone" class="drop-zone" role="button" tabindex="0" aria-describedby="drop_zone_hint">
+          <div class="drop-zone__icon" aria-hidden="true">+</div>
+          <p class="drop-zone__title">Drop video or audio here</p>
+          <p id="drop_zone_hint" class="drop-zone__hint">MP4, MOV, M4A, MP3, WAV, and similar formats are supported.</p>
+          <button id="file_select_btn" class="btn btn-primary" type="button">Choose a file</button>
+          <input type="file" id="file_input" class="visually-hidden" aria-hidden="true">
+        </div>
+        <label class="option-toggle" for="remove_silence_checkbox">
+          <input class="form-check-input" type="checkbox" id="remove_silence_checkbox">
+          <span>
+            <strong>Remove silence</strong>
+            <small>Trim long quiet sections after editing.</small>
+          </span>
+        </label>
+      </div>
+      <div class="capture-panel">
+        <div class="section-heading section-heading--compact">
+          <div>
+            <p class="section-kicker">Quick capture</p>
+            <h3 class="section-subtitle">Record in browser</h3>
           </div>
         </div>
-        {% endfor %}
+        <div id="record_controls" class="record-actions" aria-label="Recording controls">
+          <button id="record_screen_btn" class="btn btn-secondary" type="button">Record screen</button>
+          <button id="record_webcam_btn" class="btn btn-secondary" type="button">Record webcam</button>
+          <button id="record_both_btn" class="btn btn-secondary" type="button">Record both</button>
+        </div>
+        <p class="helper-copy mb-0">The UI keeps the job card in place while the backend works, so capture never feels like a dead end.</p>
       </div>
     </div>
+    <div class="queue-banner" id="upload_queue_summary" role="status" aria-live="polite">
+      {{ workflow_metrics.processing }} active processing job{% if workflow_metrics.processing != 1 %}s{% endif %} across the library.
+    </div>
+  </section>
 
-  </div>
-
-  <!-- Bootstrap JS and application script -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/static/app.js"></script>
-</body>
-</html>
+  <section id="library" class="workflow-surface">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Stage 2</p>
+        <h2 class="section-title">Episode library</h2>
+      </div>
+      <p class="section-copy">Every item stays in the same workflow: review it, choose a title, schedule it, and publish it without switching mental models.</p>
+    </div>
+    {% if not records %}
+    <div id="dashboard_empty_state" class="empty-state">
+      <h3>No episodes yet</h3>
+      <p>Start with an upload or a browser recording and the library will fill itself in here.</p>
+    </div>
+    {% else %}
+    <div id="dashboard_empty_state" class="empty-state" hidden>
+      <h3>No episodes yet</h3>
+      <p>Start with an upload or a browser recording and the library will fill itself in here.</p>
+    </div>
+    <div id="records_container" class="episode-grid" aria-live="polite">
+      {% for rec in records %}
+        {% include "partials/episode_card.html" %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+{% endblock %}

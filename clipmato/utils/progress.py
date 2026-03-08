@@ -82,6 +82,11 @@ def enrich_with_progress(records: list[dict]) -> list[dict]:
     enriched = []
     for rec in records:
         status = read_progress(rec.get("id", ""))
+        if status.get("stage") == "pending":
+            if rec.get("error"):
+                status = {"stage": "error", "progress": 0, "message": rec.get("error")}
+            elif rec.get("transcript") or rec.get("titles") or rec.get("short_description"):
+                status = {"stage": "complete", "progress": 100}
         merged = {**rec, **status}
         enriched.append(merged)
     return enriched

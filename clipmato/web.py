@@ -1,17 +1,32 @@
-"""
-Main FastAPI application entrypoint: mounts static files and includes routers.
-"""
-import os
-import logging
+"""Main FastAPI application entrypoint."""
+from __future__ import annotations
 
-logging.basicConfig(level=logging.INFO)
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .config import STATIC_DIR
+from .dependencies import get_publishing_service
 from .routers import list_routers
 
-app = FastAPI()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start and stop background services for the web app."""
+    publishing_service = get_publishing_service()
+    await publishing_service.start_worker()
+    try:
+        yield
+    finally:
+        await publishing_service.stop_worker()
+
+
+app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 for router in list_routers():

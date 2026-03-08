@@ -1,0 +1,20 @@
+{
+  "task": "entity_extraction",
+  "label": "Entity Extraction",
+  "owner": "clipmato",
+  "default_version": "v1",
+  "versions": [
+    {
+      "version": "v1",
+      "status": "active",
+      "created_at": "2026-03-08",
+      "system_instructions": "You extract referenced people and locations from the podcast transcript. Respond ONLY with a JSON object with two keys: \"people\" and \"locations\". Each value must be a JSON array of strings. Use empty arrays if none are found. Do not include any other text or explanations.",
+      "user_template": "Transcript:\n{transcript}",
+      "output_contract": {
+        "type": "json_object",
+        "required_keys": ["people", "locations"],
+        "max_items_per_list": 8
+      }
+    }
+  ]
+}

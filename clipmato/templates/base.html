@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Clipmato{% endblock %}</title>
+  <link href="/static/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body class="app-body">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="app-shell">
+    <header class="shell-header">
+      <div class="shell-header__backdrop"></div>
+      <div class="container shell-header__inner">
+        <div class="shell-brand">
+          <a class="shell-brand__mark" href="/">Clipmato</a>
+          <p class="shell-brand__tag">Capture, shape, schedule, and ship episodes from one workflow.</p>
+        </div>
+        <nav class="workflow-nav" aria-label="Primary workflow">
+          <a href="/#capture" class="workflow-link {% if app_section == 'capture' %}is-active{% endif %}" {% if app_section == 'capture' %}aria-current="page"{% endif %}>Capture</a>
+          <a href="/#library" class="workflow-link {% if app_section == 'library' %}is-active{% endif %}" {% if app_section == 'library' %}aria-current="page"{% endif %}>Library</a>
+          <a href="/scheduler" class="workflow-link {% if app_section == 'schedule' %}is-active{% endif %}" {% if app_section == 'schedule' %}aria-current="page"{% endif %}>Schedule</a>
+          <a href="/scheduler#publish-board" class="workflow-link {% if app_section == 'publish' %}is-active{% endif %}" {% if app_section == 'publish' %}aria-current="page"{% endif %}>Publish</a>
+        </nav>
+        <div class="shell-summary" aria-label="Workflow summary">
+          <div class="shell-summary__item">
+            <span class="shell-summary__label">Episodes</span>
+            <strong>{{ workflow_metrics.episodes if workflow_metrics else 0 }}</strong>
+          </div>
+          <div class="shell-summary__item">
+            <span class="shell-summary__label">Processing</span>
+            <strong>{{ workflow_metrics.processing if workflow_metrics else 0 }}</strong>
+          </div>
+          <div class="shell-summary__item">
+            <span class="shell-summary__label">Scheduled</span>
+            <strong>{{ workflow_metrics.scheduled if workflow_metrics else 0 }}</strong>
+          </div>
+          <div class="shell-summary__item">
+            <span class="shell-summary__label">Published</span>
+            <strong>{{ workflow_metrics.published if workflow_metrics else 0 }}</strong>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content" class="container app-main">
+      <section class="page-hero">
+        <div class="page-hero__copy">
+          {% block page_eyebrow %}<p class="page-eyebrow">Clipmato workflow</p>{% endblock %}
+          <h1 class="page-title">{% block page_title %}Clipmato{% endblock %}</h1>
+          {% block page_intro %}{% endblock %}
+        </div>
+        {% block hero_aside %}{% endblock %}
+      </section>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <div id="app-live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

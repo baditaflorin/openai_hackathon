@@ -21,6 +21,8 @@ from ..dependencies import (
     get_progress_service,
     get_templates,
 )
+from ..runtime import get_runtime_status
+from ..utils.presentation import present_record, workflow_metrics
 
 router = APIRouter()
 
@@ -33,9 +35,19 @@ async def index(
     progress_svc=Depends(get_progress_service),
 ):
     """Serve the upload form and list of processed files."""
-    records = progress_svc.enrich(metadata_svc.read())
+    records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
+    records.sort(key=lambda rec: rec.get("upload_time", ""), reverse=True)
+    runtime_status = get_runtime_status()
     return templates.TemplateResponse(
-        "index.html", {"request": request, "records": records}
+        request,
+        "index.html",
+        {
+            "request": request,
+            "records": records,
+            "runtime_status": runtime_status,
+            "app_section": "capture",
+            "workflow_metrics": workflow_metrics(records),
+        },
     )
 
 
@@ -49,6 +61,11 @@ async def upload(
     progress_svc=Depends(get_progress_service),
 ) -> JSONResponse:
     """Handle uploaded file: save it, enqueue processing, and return a job ID."""
+    runtime_status = get_runtime_status()
+    blockers = runtime_status.get("blockers", [])
+    if blockers:
+        return JSONResponse({"detail": blockers[0]}, status_code=400)
+
     try:
         file_path = file_io.save(file)
     except HTTPException:
@@ -57,9 +74,12 @@ async def upload(
         raise HTTPException(status_code=500, detail="Failed to store uploaded file") from exc
 
     record_id = str(uuid4())
-    # mark the pipeline as starting (after upload)
-    progress_svc.update(record_id, "transcribing")
-    # process the file in background (updates metadata and final status)
+    if runtime_status["transcription_backend"] == "local-whisper":
+        device = runtime_status["local_whisper_device"]
+        message = f"Local Whisper on {device}"
+    else:
+        message = "OpenAI Whisper API"
+    progress_svc.update(record_id, "transcribing", message)
     background_tasks.add_task(
         processing_svc.process,
         file_path,

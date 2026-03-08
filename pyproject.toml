@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clipmato"
+dynamic = ["version"]
+description = "Clipmato automated production pipeline and web UI."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+  "openai-agents",
+  "fastapi>=0.95.0",
+  "jinja2>=3.0.0",
+  "aiofiles>=23.1.0",
+  "google-api-python-client",
+  "google-auth",
+  "google-auth-httplib2",
+  "google-auth-oauthlib",
+  "pydub>=0.25.1",
+  "python-dotenv>=1.0.1",
+  "python-multipart>=0.0.9",
+  "simpleaudio",
+  "uvicorn>=0.30.0",
+]
+
+[project.optional-dependencies]
+local-transcription = [
+  "openai-whisper",
+]
+
+[project.scripts]
+clipmato-pipeline = "clipmato.cli.pipeline:main"
+clipmato-gui = "clipmato.cli.gui:run"
+clipmato-web = "clipmato.cli.web:run"
+
+[tool.setuptools.dynamic]
+version = {attr = "clipmato.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["clipmato*"]
+
+[tool.setuptools.package-data]
+clipmato = [
+  "templates/*.html",
+  "templates/partials/*.html",
+  "prompts/definitions/*.json",
+  "static/*.css",
+  "static/*.js",
+  "static/*.svg",
+]

@@ -1,9 +1,9 @@
 from agents import Agent
+from ..prompts.registry import resolve_prompt_version
+
+_prompt_version = resolve_prompt_version("title_suggestion")
 
 title_suggester_agent = Agent(
-    name="Title Suggester",
-    instructions="""
-You suggest 5 catchy and descriptive podcast episode titles based on the provided transcript.
-Return your suggestions as a JSON array of strings.
-""",
+    name=_prompt_version.label,
+    instructions=_prompt_version.system_instructions,
 )

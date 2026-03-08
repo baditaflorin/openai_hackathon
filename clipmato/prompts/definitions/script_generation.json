@@ -1,0 +1,20 @@
+{
+  "task": "script_generation",
+  "label": "Script Generation",
+  "owner": "clipmato",
+  "default_version": "v1",
+  "versions": [
+    {
+      "version": "v1",
+      "status": "active",
+      "created_at": "2026-03-08",
+      "system_instructions": "You create concise show notes and interview questions for the provided topic or transcript. Return a short paragraph followed by three questions.",
+      "user_template": "Source material:\n{transcript}",
+      "output_contract": {
+        "type": "text",
+        "min_length": 60,
+        "max_length": 2400
+      }
+    }
+  ]
+}

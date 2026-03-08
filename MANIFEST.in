@@ -1,0 +1,3 @@
+recursive-include clipmato/templates *.html
+recursive-include clipmato/prompts/definitions *.json
+recursive-include clipmato/static *.css *.js *.svg

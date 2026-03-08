@@ -2,14 +2,18 @@
 Routes for viewing and managing individual episode records.
 """
 from fastapi import APIRouter, Request, HTTPException, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pathlib import Path
 
+from ..prompts import record_title_selection_evaluation
+from ..config import YOUTUBE_DEFAULT_PRIVACY_STATUS
 from ..dependencies import (
     get_templates,
     get_metadata_service,
     get_file_io_service,
+    get_progress_service,
 )
+from ..utils.presentation import present_record, workflow_metrics
 
 router = APIRouter()
 
@@ -20,14 +24,51 @@ async def record_detail(
     record_id: str,
     templates=Depends(get_templates),
     metadata_svc=Depends(get_metadata_service),
+    progress_svc=Depends(get_progress_service),
 ):
     """Show detailed view for a processed record."""
-    records = metadata_svc.read()
+    records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
     record = next((it for it in records if it.get("id") == record_id), None)
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return templates.TemplateResponse(
-        "record.html", {"request": request, "record": record}
+        request,
+        "record.html",
+        {
+            "request": request,
+            "record": record,
+            "app_section": "library",
+            "workflow_metrics": workflow_metrics(records),
+            "default_youtube_privacy_status": YOUTUBE_DEFAULT_PRIVACY_STATUS,
+        },
+    )
+
+
+@router.get("/record/{record_id}/summary")
+async def record_summary(
+    record_id: str,
+    metadata_svc=Depends(get_metadata_service),
+    progress_svc=Depends(get_progress_service),
+) -> JSONResponse:
+    """Return a compact record payload for progressive frontend updates."""
+    records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
+    record = next((it for it in records if it.get("id") == record_id), None)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return JSONResponse(
+        {
+            "id": record["id"],
+            "filename": record.get("filename"),
+            "display_title": record.get("display_title"),
+            "upload_time": record.get("upload_time"),
+            "progress": record.get("progress", 100),
+            "stage": record.get("stage", "complete"),
+            "message": record.get("message"),
+            "error": record.get("error"),
+            "schedule_time": record.get("schedule_time"),
+            "youtube_job": record.get("youtube_job"),
+            "detail_url": f"/record/{record_id}",
+        }
     )
 
 
@@ -42,7 +83,9 @@ async def select_title(
     record = next((it for it in records if it.get("id") == record_id), None)
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found")
-    metadata_svc.update(record_id, {"selected_title": selected_title})
+    updated_record = metadata_svc.update(record_id, {"selected_title": selected_title})
+    if updated_record is not None:
+        record_title_selection_evaluation(updated_record, selected_title)
     return RedirectResponse(url=f"/record/{record_id}", status_code=303)
 
 

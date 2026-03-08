@@ -1,66 +1,207 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clipmato - Episode Details: {{ record.filename }}</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/style.css" rel="stylesheet">
-</head>
-<body>
-  <nav class="navbar navbar-light bg-white shadow-sm mb-4">
-    <div class="container">
-      <a class="navbar-brand fw-semibold" href="/">Clipmato</a>
-      <a href="/scheduler" class="btn btn-outline-primary">Scheduler</a>
-    </div>
-  </nav>
-  <div class="container pb-4">
-    <h1 class="mb-3">Episode Details: {{ record.filename }}</h1>
-    <p><strong>Uploaded at:</strong> {{ record.upload_time }}</p>
-    {% if record.original_duration is defined %}
-    <p><strong>Original duration:</strong> {{ record.original_duration | round(2) }} seconds</p>
-    <p><strong>Trimmed duration:</strong> {{ record.trimmed_duration | round(2) }} seconds</p>
-    {% endif %}
+{% extends "base.html" %}
 
-    <div class="mb-4">
-      <h2>Choose a Title</h2>
-      <form method="post" action="/record/{{ record.id }}/title">
-        {% for title in record.titles %}
-        <div class="form-check mb-2">
-          <input class="form-check-input" type="radio" name="selected_title" id="title{{ loop.index }}" value="{{ title }}" {% if record.selected_title == title %}checked{% endif %}>
-          <label class="form-check-label" for="title{{ loop.index }}">{{ title }}</label>
+{% block title %}Clipmato - {{ record.display_title }}{% endblock %}
+
+{% block page_eyebrow %}<p class="page-eyebrow">Library review</p>{% endblock %}
+
+{% block page_title %}{{ record.display_title }}{% endblock %}
+
+{% block page_intro %}
+<p class="page-intro">
+  Review the transcript, lock the title, and move this episode forward into scheduling and publishing without leaving the record.
+</p>
+{% endblock %}
+
+{% block hero_aside %}
+<aside class="hero-panel">
+  <p class="hero-panel__eyebrow">Episode status</p>
+  <div class="hero-panel__stack">
+    <div>
+      <span>Uploaded</span>
+      <strong>{{ record.upload_time }}</strong>
+    </div>
+    <div>
+      <span>Processing</span>
+      <strong>{{ record.progress }}%</strong>
+    </div>
+    <div>
+      <span>Scheduled</span>
+      <strong>{{ record.schedule_time or 'Not scheduled' }}</strong>
+    </div>
+    <div>
+      <span>YouTube</span>
+      <strong>{{ record.youtube_job.status | replace('_', ' ') | title if record.youtube_job else 'Not selected' }}</strong>
+    </div>
+  </div>
+</aside>
+{% endblock %}
+
+{% block content %}
+  {% if record.error %}
+  <section class="workflow-surface alert-surface is-danger" role="alert">
+    <h2 class="section-title">Processing failed</h2>
+    <p>{{ record.error }}</p>
+    <a href="/" class="btn btn-primary">Back to capture</a>
+  </section>
+  {% else %}
+  <section class="workflow-surface workflow-surface--split">
+    <div class="detail-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Stage 3</p>
+          <h2 class="section-title">Lock the editorial details</h2>
         </div>
-        {% endfor %}
-        <button type="submit" class="btn btn-success">Save Title</button>
+        <a href="/scheduler" class="btn btn-outline-secondary btn-sm">Open scheduler</a>
+      </div>
+      <form method="post" action="/record/{{ record.id }}/title" class="stack-form" data-busy-form="true">
+        <fieldset class="form-cluster">
+          <legend class="form-legend">Choose the public title</legend>
+          {% for title in record.titles %}
+          <label class="choice-card">
+            <input class="form-check-input" type="radio" name="selected_title" value="{{ title }}" {% if record.selected_title == title %}checked{% endif %}>
+            <span>{{ title }}</span>
+          </label>
+          {% endfor %}
+        </fieldset>
+        <button type="submit" class="btn btn-primary" data-busy-label="Saving title...">Save title</button>
       </form>
     </div>
 
-    <div class="mb-4">
-      <h2>Transcript</h2>
-      <pre class="bg-light p-3 border rounded">{{ record.transcript }}</pre>
+    <div class="detail-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Stage 4</p>
+          <h2 class="section-title">Schedule and publish</h2>
+        </div>
+      </div>
+      <form method="post" action="/record/{{ record.id }}/schedule" class="stack-form" data-busy-form="true">
+        <div class="form-cluster">
+          <label class="form-label" for="schedule_time">Release time</label>
+          <input id="schedule_time" type="datetime-local" name="schedule_time" class="form-control" value="{{ record.schedule_time[:16] if record.schedule_time }}" required>
+        </div>
+        <div class="target-grid">
+          {% for target in ['YouTube', 'Spotify', 'Apple Podcasts'] %}
+          <label class="choice-card choice-card--compact">
+            <input class="form-check-input" type="checkbox" name="publish_targets" value="{{ target }}" {% if record.publish_targets and target in record.publish_targets %}checked{% endif %}>
+            <span>{{ target }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="form-cluster">
+          {% set selected_privacy = record.youtube_job.privacy_status if record.youtube_job else default_youtube_privacy_status %}
+          <label class="form-label" for="youtube_privacy_status">YouTube privacy</label>
+          <select id="youtube_privacy_status" name="youtube_privacy_status" class="form-select">
+            <option value="private" {% if selected_privacy == 'private' %}selected{% endif %}>Private</option>
+            <option value="unlisted" {% if selected_privacy == 'unlisted' %}selected{% endif %}>Unlisted</option>
+            <option value="public" {% if selected_privacy == 'public' %}selected{% endif %}>Public</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-secondary" data-busy-label="Saving schedule...">Save schedule</button>
+      </form>
+
+      {% if record.youtube_job %}
+      <div class="status-card">
+        <div class="status-card__row">
+          <span class="status-pill {% if record.youtube_job.status == 'published' %}is-success{% elif record.youtube_job.status in ['scheduled', 'publishing'] %}is-brand{% elif record.youtube_job.status in ['blocked', 'failed'] %}is-danger{% else %}is-muted{% endif %}">
+            {{ record.youtube_job.status | replace('_', ' ') | title }}
+          </span>
+          {% if record.youtube_job.remote_url %}
+          <a href="{{ record.youtube_job.remote_url }}" target="_blank" rel="noreferrer" class="btn btn-outline-secondary btn-sm">Open on YouTube</a>
+          {% endif %}
+        </div>
+        {% if record.youtube_job.last_error %}
+        <p class="status-card__copy is-danger">{{ record.youtube_job.last_error }}</p>
+        {% endif %}
+        {% if record.youtube_job.scheduled_for %}
+        <p class="status-card__copy">Target publish time: {{ record.youtube_job.scheduled_for }}</p>
+        {% endif %}
+        <div class="action-row">
+          {% if not record.youtube_job or record.youtube_job.status not in ['published', 'publishing'] %}
+          <form method="post" action="/record/{{ record.id }}/publish/youtube/now" data-busy-form="true">
+            <button type="submit" class="btn btn-outline-primary btn-sm" data-busy-label="Queueing...">Publish to YouTube now</button>
+          </form>
+          {% endif %}
+          {% if record.youtube_job.status in ['failed', 'blocked', 'pending_connection', 'cancelled'] %}
+          <form method="post" action="/record/{{ record.id }}/publish/youtube/retry" data-busy-form="true">
+            <button type="submit" class="btn btn-outline-secondary btn-sm" data-busy-label="Retrying...">Retry</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if record.original_duration is defined %}
+      <div class="metadata-list">
+        <div><span>Original duration</span><strong>{{ record.original_duration | round(2) }} seconds</strong></div>
+        <div><span>Trimmed duration</span><strong>{{ record.trimmed_duration | round(2) }} seconds</strong></div>
+      </div>
+      {% endif %}
     </div>
+  </section>
 
-    <div class="mb-4">
-      <h2>Short Description</h2>
-      <p class="bg-light p-3 border rounded">{{ record.short_description }}</p>
-    </div>
+  <section class="content-grid">
+    <article class="workflow-surface content-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Prompt engine</p>
+          <h2 class="section-title">Versioned generation runs</h2>
+        </div>
+      </div>
+      <div class="metadata-list">
+        {% for prompt_run in record.prompt_run_items %}
+        <div>
+          <span>{{ prompt_run.task_label }}</span>
+          <strong>
+            {{ prompt_run.prompt_version }}
+            · {{ prompt_run.backend }}
+            {% if prompt_run.used_fallback %}· fallback{% endif %}
+          </strong>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
 
-    <div class="mb-4">
-      <h2>Long Description</h2>
-      <p class="bg-light p-3 border rounded">{{ record.long_description }}</p>
-    </div>
+    <article class="workflow-surface content-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Transcript</p>
+          <h2 class="section-title">Source transcript</h2>
+        </div>
+      </div>
+      <pre class="content-pre">{{ record.transcript }}</pre>
+    </article>
 
-    <div class="mb-4">
-      <h2>Entities</h2>
-      <p><strong>People:</strong> {{ record.people|join(', ') }}</p>
-      <p><strong>Locations:</strong> {{ record.locations|join(', ') }}</p>
-    </div>
+    <article class="workflow-surface content-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Summary</p>
+          <h2 class="section-title">Descriptions</h2>
+        </div>
+      </div>
+      <div class="content-stack">
+        <div class="copy-block">
+          <h3 class="content-subtitle">Short description</h3>
+          <p>{{ record.short_description }}</p>
+        </div>
+        <div class="copy-block">
+          <h3 class="content-subtitle">Long description</h3>
+          <p>{{ record.long_description }}</p>
+        </div>
+      </div>
+    </article>
 
-    <a href="/" class="btn btn-secondary">Back to home</a>
-  </div>
-
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    <article class="workflow-surface content-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Entities</p>
+          <h2 class="section-title">Referenced people and places</h2>
+        </div>
+      </div>
+      <div class="metadata-list">
+        <div><span>People</span><strong>{{ record.people|join(', ') or 'None detected' }}</strong></div>
+        <div><span>Locations</span><strong>{{ record.locations|join(', ') or 'None detected' }}</strong></div>
+      </div>
+    </article>
+  </section>
+  {% endif %}
+{% endblock %}

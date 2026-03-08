@@ -1,0 +1,52 @@
+<article
+  class="episode-card {% if rec.is_processing %}is-processing{% endif %} {% if rec.is_failed %}is-failed{% endif %}"
+  data-record-id="{{ rec.id }}"
+  data-file-name="{{ rec.filename }}"
+  data-progress-value="{{ rec.progress|default(100) }}"
+  data-progress-stage="{{ rec.stage|default('complete') }}"
+  data-progress-track="{% if rec.progress|default(100) < 100 %}true{% else %}false{% endif %}"
+>
+  <div class="episode-card__header">
+    <div>
+      <p class="episode-card__eyebrow">Episode</p>
+      <h3 class="episode-card__title" data-card-title>{{ rec.display_title }}</h3>
+    </div>
+    {% if rec.youtube_job %}
+    <span class="status-pill {% if rec.youtube_job.status == 'published' %}is-success{% elif rec.youtube_job.status in ['scheduled', 'publishing'] %}is-brand{% elif rec.youtube_job.status in ['blocked', 'failed'] %}is-danger{% else %}is-muted{% endif %}">
+      {{ rec.youtube_job.status | replace('_', ' ') | title }}
+    </span>
+    {% endif %}
+  </div>
+  <p class="episode-card__meta" data-card-time>{{ rec.upload_time }}</p>
+  <div class="episode-card__status">
+    {% if rec.is_failed %}
+    <span class="status-pill is-danger" data-card-badge>Error</span>
+    {% elif rec.progress|default(100) < 100 %}
+    <span class="status-pill is-brand" data-card-badge>{{ rec.stage.replace('_', ' ') | title }} ({{ rec.progress }}%)</span>
+    {% else %}
+    <span class="status-pill is-success" data-card-badge>Ready</span>
+    {% endif %}
+    <div class="progress shell-progress" data-card-progress-wrap {% if rec.progress|default(100) >= 100 or rec.is_failed %}hidden{% endif %}>
+      <div class="progress-bar" role="progressbar" style="width: {{ rec.progress|default(100) }}%;" aria-valuenow="{{ rec.progress|default(100) }}" aria-valuemin="0" aria-valuemax="100" data-card-progress>{{ rec.progress|default(100) }}%</div>
+    </div>
+    <p class="episode-card__detail" data-card-detail>
+      {% if rec.is_failed %}
+      {{ rec.message or rec.error }}
+      {% elif rec.progress|default(100) < 100 %}
+      {{ rec.message or '' }}
+      {% elif rec.schedule_time %}
+      Scheduled for {{ rec.schedule_time }}
+      {% else %}
+      Ready for title selection, scheduling, and publishing.
+      {% endif %}
+    </p>
+  </div>
+  <div class="episode-card__actions" data-card-actions>
+    {% if rec.progress|default(100) >= 100 and not rec.error %}
+    <a href="/record/{{ rec.id }}" class="btn btn-primary btn-sm">Open Episode</a>
+    {% endif %}
+    <form method="post" action="/record/{{ rec.id }}/delete" class="inline-form" data-busy-form="true">
+      <button type="submit" class="btn btn-outline-secondary btn-sm" data-busy-label="Removing...">Remove</button>
+    </form>
+  </div>
+</article>

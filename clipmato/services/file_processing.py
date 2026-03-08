@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 import logging
 from uuid import uuid4
-from datetime import datetime
+from datetime import UTC, datetime
 
 from ..steps.transcription import transcribe_audio
-from ..steps.description_generation import generate_descriptions_async
-from ..steps.entity_extraction import extract_entities_async
-from ..steps.title_suggestion import propose_titles_async
-from ..steps.script_generation import generate_script_async
+from ..steps.description_generation import generate_descriptions_with_prompt_async
+from ..steps.entity_extraction import extract_entities_with_prompt_async
+from ..steps.title_suggestion import propose_titles_with_prompt_async
+from ..steps.script_generation import generate_script_with_prompt_async
 from ..steps.audio_editing import edit_audio_async
-from ..steps.distribution import distribute_async
+from ..steps.distribution import distribute_with_prompt_async
 from ..utils.progress import update_progress
 from ..utils.metadata import append_metadata
 from ..steps.silence_removal import remove_silence as remove_silence_step
@@ -51,27 +51,27 @@ async def process_file_async(
         ),
         Step(
             "descriptions",
-            generate_descriptions_async,
-            input_keys=["transcript"],
-            output_keys="desc",
+            generate_descriptions_with_prompt_async,
+            input_keys=["transcript", "rec_id"],
+            output_keys=["desc", "desc_prompt_run"],
         ),
         Step(
             "entities",
-            extract_entities_async,
-            input_keys=["transcript"],
-            output_keys="entities",
+            extract_entities_with_prompt_async,
+            input_keys=["transcript", "rec_id"],
+            output_keys=["entities", "entities_prompt_run"],
         ),
         Step(
             "titles",
-            propose_titles_async,
-            input_keys=["transcript"],
-            output_keys="titles",
+            propose_titles_with_prompt_async,
+            input_keys=["transcript", "rec_id"],
+            output_keys=["titles", "titles_prompt_run"],
         ),
         Step(
             "script",
-            generate_script_async,
-            input_keys=["transcript"],
-            output_keys="script",
+            generate_script_with_prompt_async,
+            input_keys=["transcript", "rec_id"],
+            output_keys=["script", "script_prompt_run"],
         ),
         Step(
             "editing",
@@ -95,9 +95,9 @@ async def process_file_async(
     steps.append(
         Step(
             "distribution",
-            distribute_async,
-            input_keys=["edited_audio"],
-            output_keys="distribution",
+            distribute_with_prompt_async,
+            input_keys=["edited_audio", "rec_id"],
+            output_keys=["distribution", "distribution_prompt_run"],
         )
     )
 
@@ -110,7 +110,7 @@ async def process_file_async(
         record: dict[str, Any] = {
             "id": rec_id,
             "filename": filename,
-            "upload_time": datetime.utcnow().isoformat(),
+            "upload_time": datetime.now(UTC).isoformat(),
             "transcript": context["transcript"],
             "titles": context["titles"],
             "selected_title": None,
@@ -121,6 +121,16 @@ async def process_file_async(
             "script": context["script"],
             "edited_audio": context["edited_audio"],
             "distribution": context["distribution"],
+            "schedule_time": None,
+            "publish_targets": [],
+            "publish_jobs": {},
+            "prompt_runs": {
+                "title_suggestion": context["titles_prompt_run"],
+                "description_generation": context["desc_prompt_run"],
+                "entity_extraction": context["entities_prompt_run"],
+                "script_generation": context["script_prompt_run"],
+                "distribution_generation": context["distribution_prompt_run"],
+            },
         }
         if remove_silence:
             record["original_duration"] = context["original_duration"]
@@ -136,8 +146,12 @@ async def process_file_async(
         record = {
             "id": rec_id,
             "filename": filename,
-            "upload_time": datetime.utcnow().isoformat(),
+            "upload_time": datetime.now(UTC).isoformat(),
             "error": err_msg,
+            "schedule_time": None,
+            "publish_targets": [],
+            "publish_jobs": {},
+            "prompt_runs": {},
         }
         append_metadata(record)
         return record

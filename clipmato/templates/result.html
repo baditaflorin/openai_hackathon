@@ -1,49 +1,64 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clipmato Results</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/style.css" rel="stylesheet">
-</head>
-<body>
-  <nav class="navbar navbar-light bg-white shadow-sm mb-4">
-    <div class="container">
-      <a class="navbar-brand fw-semibold" href="/">Clipmato</a>
-      <a href="/scheduler" class="btn btn-outline-primary">Scheduler</a>
+{% extends "base.html" %}
+
+{% block title %}Clipmato - Processing Results{% endblock %}
+
+{% block page_eyebrow %}<p class="page-eyebrow">Results</p>{% endblock %}
+
+{% block page_title %}Processing results for {{ filename }}{% endblock %}
+
+{% block page_intro %}
+<p class="page-intro">This view mirrors the episode workflow and points back to the full record when processing is complete.</p>
+{% endblock %}
+
+{% block content %}
+  <section class="content-grid">
+    <article class="workflow-surface content-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Transcript</p>
+          <h2 class="section-title">Source transcript</h2>
+        </div>
+      </div>
+      <pre class="content-pre">{{ transcript }}</pre>
+    </article>
+
+    <article class="workflow-surface content-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Summary</p>
+          <h2 class="section-title">Descriptions</h2>
+        </div>
+      </div>
+      <div class="content-stack">
+        <div class="copy-block">
+          <h3 class="content-subtitle">Short description</h3>
+          <p>{{ short_description }}</p>
+        </div>
+        <div class="copy-block">
+          <h3 class="content-subtitle">Long description</h3>
+          <p>{{ long_description }}</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="workflow-surface content-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Entities</p>
+          <h2 class="section-title">Detected references</h2>
+        </div>
+      </div>
+      <div class="metadata-list">
+        <div><span>People</span><strong>{{ people|join(', ') or 'None detected' }}</strong></div>
+        <div><span>Locations</span><strong>{{ locations|join(', ') or 'None detected' }}</strong></div>
+      </div>
+    </article>
+  </section>
+
+  <section class="workflow-surface">
+    <div class="action-row">
+      <a href="/record/{{ id }}" class="btn btn-primary">Open full episode record</a>
+      <a href="/" class="btn btn-outline-secondary">Back to capture</a>
     </div>
-  </nav>
-  <div class="container pb-4">
-    <h1 class="mb-4">Processing Results for {{ filename }}</h1>
-
-    <div class="mb-4">
-      <h2>Transcript</h2>
-      <pre class="bg-light p-3 border rounded">{{ transcript }}</pre>
-    </div>
-
-    <div class="mb-4">
-      <h2>Short Description</h2>
-      <p class="bg-light p-3 border rounded">{{ short_description }}</p>
-    </div>
-
-    <div class="mb-4">
-      <h2>Long Description</h2>
-      <p class="bg-light p-3 border rounded">{{ long_description }}</p>
-    </div>
-
-    <div class="mb-4">
-      <h2>Entities</h2>
-      <p><strong>People:</strong> {{ people|join(', ') }}</p>
-      <p><strong>Locations:</strong> {{ locations|join(', ') }}</p>
-    </div>
-
-    <a href="/record/{{ id }}" class="btn btn-primary me-2">View Details</a>
-    <a href="/" class="btn btn-secondary">Upload another file</a>
-  </div>
-
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+  </section>
+{% endblock %}

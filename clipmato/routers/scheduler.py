@@ -7,15 +7,25 @@ import logging
 from datetime import datetime
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from ..config import PUBLIC_BASE_URL, YOUTUBE_DEFAULT_PRIVACY_STATUS
 from ..dependencies import (
     get_templates,
     get_metadata_service,
+    get_publishing_service,
+    get_progress_service,
     get_scheduling_service,
 )
+from ..utils.presentation import present_record, workflow_metrics
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _youtube_callback_url(request: Request) -> str:
+    if PUBLIC_BASE_URL:
+        return f"{PUBLIC_BASE_URL}{request.app.url_path_for('youtube_oauth_callback')}"
+    return str(request.url_for("youtube_oauth_callback"))
 
 
 @router.get("/scheduler", response_class=HTMLResponse)
@@ -23,9 +33,16 @@ async def scheduler_page(
     request: Request,
     templates=Depends(get_templates),
     metadata_svc=Depends(get_metadata_service),
+    progress_svc=Depends(get_progress_service),
+    publishing_svc=Depends(get_publishing_service),
 ):
     """Show the scheduling page for manual or automatic scheduling."""
-    records = metadata_svc.read()
+    records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
+    records.sort(key=lambda rec: rec.get("schedule_time") or rec.get("upload_time", ""))
+    youtube_status = publishing_svc.get_provider_status(
+        "youtube",
+        redirect_uri=_youtube_callback_url(request),
+    )
     today = datetime.today()
     year = today.year
     month = today.month
@@ -42,6 +59,7 @@ async def scheduler_page(
                     "title": rec.get("selected_title") or rec.get("filename", ""),
                 })
     return templates.TemplateResponse(
+        request,
         "scheduler.html",
         {
             "request": request,
@@ -51,6 +69,12 @@ async def scheduler_page(
             "year": year,
             "month_name": calendar.month_name[month],
             "events": events,
+            "youtube_status": youtube_status,
+            "scheduler_notice": request.query_params.get("notice"),
+            "scheduler_error": request.query_params.get("error"),
+            "default_youtube_privacy_status": YOUTUBE_DEFAULT_PRIVACY_STATUS,
+            "app_section": "schedule",
+            "workflow_metrics": workflow_metrics(records),
         },
     )
 
@@ -61,6 +85,7 @@ async def scheduler_auto(
     n_days: int | None = Form(None),
     metadata_svc=Depends(get_metadata_service),
     scheduling_svc=Depends(get_scheduling_service),
+    publishing_svc=Depends(get_publishing_service),
 ):
     """Automatically propose and save schedule times for unscheduled records."""
     logger.info(
@@ -74,7 +99,15 @@ async def scheduler_auto(
     if unscheduled:
         suggestions = await scheduling_svc.propose(unscheduled, cadence=cadence, n_days=n_days)
         for rid, stime in suggestions.items():
-            metadata_svc.update(rid, {"schedule_time": stime})
+            record = metadata_svc.get(rid)
+            if record is None:
+                continue
+            publishing_svc.schedule_record(
+                rid,
+                stime,
+                list(record.get("publish_targets") or []),
+                youtube_privacy_status=((record.get("publish_jobs") or {}).get("youtube") or {}).get("privacy_status"),
+            )
     return RedirectResponse(url="/scheduler", status_code=303)
 
 
@@ -83,12 +116,18 @@ async def schedule_record(
     record_id: str,
     schedule_time: str = Form(...),
     publish_targets: list[str] = Form([]),
+    youtube_privacy_status: str = Form(YOUTUBE_DEFAULT_PRIVACY_STATUS),
     metadata_svc=Depends(get_metadata_service),
+    publishing_svc=Depends(get_publishing_service),
 ):
     """Handle manual scheduling and publish-target selection for a single record."""
-    records = metadata_svc.read()
-    record = next((it for it in records if it.get("id") == record_id), None)
+    record = metadata_svc.get(record_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found")
-    metadata_svc.update(record_id, {"schedule_time": schedule_time, "publish_targets": publish_targets})
+    publishing_svc.schedule_record(
+        record_id,
+        schedule_time,
+        publish_targets,
+        youtube_privacy_status=youtube_privacy_status,
+    )
     return RedirectResponse(url="/scheduler", status_code=303)
