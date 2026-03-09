@@ -20,22 +20,32 @@
       <span>Transcription</span>
       <strong>{{ runtime_status.transcription_backend }}</strong>
       {% if runtime_status.transcription_backend == 'local-whisper' %}
-      <small>device: {{ runtime_status.local_whisper_device }}</small>
+      <small>{{ runtime_status.local_whisper_model }} on {{ runtime_status.local_whisper_device }}</small>
       {% endif %}
     </div>
     <div>
       <span>Content</span>
       <strong>{{ runtime_status.content_backend }}</strong>
+      {% if runtime_status.content_backend == 'ollama' %}
+      <small>{{ runtime_status.ollama_model }}</small>
+      {% elif runtime_status.content_backend == 'openai' %}
+      <small>{{ runtime_status.openai_content_model }}</small>
+      {% endif %}
     </div>
     <div>
       <span>OpenAI key</span>
       <strong>{{ 'configured' if runtime_status.openai_api_key_configured else 'missing' }}</strong>
+      <small>source: {{ runtime_status.secret_status.openai_api_key.source }}</small>
     </div>
     <div>
-      <span>Scheduler</span>
-      <strong>{{ workflow_metrics.scheduled }}</strong>
+      <span>Google OAuth</span>
+      <strong>{{ 'configured' if runtime_status.google_oauth_configured else 'missing' }}</strong>
+      <small>client source: {{ runtime_status.secret_status.google_client_id.source }}</small>
     </div>
   </div>
+  <p class="hero-panel__note">
+    Change backends, endpoints, and saved credentials in <a href="/settings">Settings</a>.
+  </p>
 </aside>
 {% endblock %}
 

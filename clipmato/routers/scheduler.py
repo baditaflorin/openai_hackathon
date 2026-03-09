@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from ..config import PUBLIC_BASE_URL, YOUTUBE_DEFAULT_PRIVACY_STATUS
+from ..config import YOUTUBE_DEFAULT_PRIVACY_STATUS
 from ..dependencies import (
     get_templates,
     get_metadata_service,
@@ -15,6 +15,7 @@ from ..dependencies import (
     get_progress_service,
     get_scheduling_service,
 )
+from ..runtime import get_public_base_url
 from ..utils.presentation import present_record, workflow_metrics
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,9 @@ router = APIRouter()
 
 
 def _youtube_callback_url(request: Request) -> str:
-    if PUBLIC_BASE_URL:
-        return f"{PUBLIC_BASE_URL}{request.app.url_path_for('youtube_oauth_callback')}"
+    public_base_url = get_public_base_url()
+    if public_base_url:
+        return f"{public_base_url}{request.app.url_path_for('youtube_oauth_callback')}"
     return str(request.url_for("youtube_oauth_callback"))
 
 

@@ -3,16 +3,24 @@ from __future__ import annotations
 
 import copy
 import logging
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
-from agents import Agent, Runner
+import httpx
+from agents import Agent, OpenAIChatCompletionsModel, RunConfig, Runner
+from openai import AsyncOpenAI
 
-from ..runtime import resolve_content_backend
+from ..runtime import (
+    get_ollama_base_url,
+    get_ollama_model,
+    get_ollama_timeout_seconds,
+    get_openai_api_key,
+    get_openai_content_model,
+    resolve_content_backend,
+)
 from ..utils.metadata import get_metadata_record
 from .contracts import parse_task_output, validate_task_output
 from .registry import resolve_prompt_version
@@ -25,11 +33,6 @@ from .storage import (
 
 
 logger = logging.getLogger(__name__)
-DEFAULT_OPENAI_CONTENT_MODEL = (
-    os.getenv("CLIPMATO_OPENAI_CONTENT_MODEL", "").strip()
-    or os.getenv("OPENAI_MODEL", "").strip()
-    or "openai-agents-default"
-)
 
 
 @dataclass(slots=True)
@@ -150,7 +153,7 @@ def _local_execution(
             task=task,
             prompt_version=prompt_version.version,
             prompt_label=prompt_version.label,
-            backend="local",
+            backend="local-basic",
             model="local-basic",
             started_at=started_at,
             completed_at=completed_at,
@@ -171,11 +174,30 @@ def _local_execution(
     return PromptExecution(output=validation.normalized if validation.passed else fallback_output, prompt_run=run)
 
 
-def _finalize_openai_execution(
+def _openai_run_config() -> RunConfig:
+    api_key = get_openai_api_key()
+    if not api_key:
+        raise RuntimeError("No OpenAI API key is configured.")
+    client = AsyncOpenAI(api_key=api_key, base_url="https://api.openai.com/v1")
+    model = OpenAIChatCompletionsModel(
+        model=get_openai_content_model(),
+        openai_client=client,
+    )
+    return RunConfig(
+        model=model,
+        tracing_disabled=True,
+        trace_include_sensitive_data=False,
+        workflow_name="Clipmato prompt engine",
+    )
+
+
+def _finalize_remote_execution(
     *,
     task: str,
     record_id: str | None,
     prompt_version: Any,
+    backend: str,
+    model_name: str,
     rendered_prompt: str,
     inputs: dict[str, Any],
     fallback_output: Any,
@@ -226,8 +248,8 @@ def _finalize_openai_execution(
             task=task,
             prompt_version=prompt_version.version,
             prompt_label=prompt_version.label,
-            backend="openai",
-            model=DEFAULT_OPENAI_CONTENT_MODEL,
+            backend=backend,
+            model=model_name,
             started_at=started_at,
             completed_at=completed_at,
             duration_ms=round((perf_counter() - started_perf) * 1000),
@@ -245,6 +267,38 @@ def _finalize_openai_execution(
     return PromptExecution(output=final_output, prompt_run=run)
 
 
+def _run_ollama_request_sync(prompt_version: Any, rendered_prompt: str) -> str:
+    response = httpx.post(
+        f"{get_ollama_base_url()}/api/generate",
+        json={
+            "model": get_ollama_model(),
+            "prompt": rendered_prompt,
+            "system": prompt_version.system_instructions,
+            "stream": False,
+        },
+        timeout=get_ollama_timeout_seconds(),
+    )
+    response.raise_for_status()
+    payload = response.json()
+    return str(payload.get("response") or "").strip()
+
+
+async def _run_ollama_request_async(prompt_version: Any, rendered_prompt: str) -> str:
+    async with httpx.AsyncClient(timeout=get_ollama_timeout_seconds()) as client:
+        response = await client.post(
+            f"{get_ollama_base_url()}/api/generate",
+            json={
+                "model": get_ollama_model(),
+                "prompt": rendered_prompt,
+                "system": prompt_version.system_instructions,
+                "stream": False,
+            },
+        )
+    response.raise_for_status()
+    payload = response.json()
+    return str(payload.get("response") or "").strip()
+
+
 def run_prompt_task_sync(
     task: str,
     variables: dict[str, Any],
@@ -258,7 +312,8 @@ def run_prompt_task_sync(
     rendered_prompt = _render_prompt(version.user_template, variables)
     started_at = datetime.now(UTC).isoformat()
     started_perf = perf_counter()
-    if resolve_content_backend() == "local":
+    backend = resolve_content_backend()
+    if backend == "local-basic":
         return _local_execution(
             task=task,
             record_id=record_id,
@@ -271,15 +326,22 @@ def run_prompt_task_sync(
         )
 
     agent = Agent(name=version.label, instructions=version.system_instructions)
+    backend_name = "openai" if backend == "openai" else "ollama"
+    model_name = get_openai_content_model() if backend == "openai" else get_ollama_model()
     try:
-        result = Runner.run_sync(agent, rendered_prompt)
-        raw_output = (result.final_output or "").strip()
+        if backend == "openai":
+            result = Runner.run_sync(agent, rendered_prompt, run_config=_openai_run_config())
+            raw_output = (result.final_output or "").strip()
+        else:
+            raw_output = _run_ollama_request_sync(version, rendered_prompt)
     except Exception as exc:
         logger.exception("Prompt task %s failed", task)
-        return _finalize_openai_execution(
+        return _finalize_remote_execution(
             task=task,
             record_id=record_id,
             prompt_version=version,
+            backend=backend_name,
+            model_name=model_name,
             rendered_prompt=rendered_prompt,
             inputs=variables,
             fallback_output=fallback_output,
@@ -289,10 +351,12 @@ def run_prompt_task_sync(
             error=exc,
         )
 
-    return _finalize_openai_execution(
+    return _finalize_remote_execution(
         task=task,
         record_id=record_id,
         prompt_version=version,
+        backend=backend_name,
+        model_name=model_name,
         rendered_prompt=rendered_prompt,
         inputs=variables,
         fallback_output=fallback_output,
@@ -315,7 +379,8 @@ async def run_prompt_task_async(
     rendered_prompt = _render_prompt(version.user_template, variables)
     started_at = datetime.now(UTC).isoformat()
     started_perf = perf_counter()
-    if resolve_content_backend() == "local":
+    backend = resolve_content_backend()
+    if backend == "local-basic":
         return _local_execution(
             task=task,
             record_id=record_id,
@@ -328,15 +393,22 @@ async def run_prompt_task_async(
         )
 
     agent = Agent(name=version.label, instructions=version.system_instructions)
+    backend_name = "openai" if backend == "openai" else "ollama"
+    model_name = get_openai_content_model() if backend == "openai" else get_ollama_model()
     try:
-        result = await Runner.run(agent, rendered_prompt)
-        raw_output = (result.final_output or "").strip()
+        if backend == "openai":
+            result = await Runner.run(agent, rendered_prompt, run_config=_openai_run_config())
+            raw_output = (result.final_output or "").strip()
+        else:
+            raw_output = await _run_ollama_request_async(version, rendered_prompt)
     except Exception as exc:
         logger.exception("Prompt task %s failed", task)
-        return _finalize_openai_execution(
+        return _finalize_remote_execution(
             task=task,
             record_id=record_id,
             prompt_version=version,
+            backend=backend_name,
+            model_name=model_name,
             rendered_prompt=rendered_prompt,
             inputs=variables,
             fallback_output=fallback_output,
@@ -346,10 +418,12 @@ async def run_prompt_task_async(
             error=exc,
         )
 
-    return _finalize_openai_execution(
+    return _finalize_remote_execution(
         task=task,
         record_id=record_id,
         prompt_version=version,
+        backend=backend_name,
+        model_name=model_name,
         rendered_prompt=rendered_prompt,
         inputs=variables,
         fallback_output=fallback_output,

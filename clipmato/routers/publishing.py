@@ -6,9 +6,9 @@ from urllib.parse import quote_plus
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from ..config import PUBLIC_BASE_URL
 from ..dependencies import get_metadata_service, get_publishing_service
 from ..providers import PublishError
+from ..runtime import get_public_base_url
 
 router = APIRouter()
 
@@ -18,8 +18,9 @@ def _scheduler_redirect(kind: str, message: str) -> RedirectResponse:
 
 
 def _public_callback_url(request: Request, route_name: str) -> str:
-    if PUBLIC_BASE_URL:
-        return f"{PUBLIC_BASE_URL}{request.app.url_path_for(route_name)}"
+    public_base_url = get_public_base_url()
+    if public_base_url:
+        return f"{public_base_url}{request.app.url_path_for(route_name)}"
     return str(request.url_for(route_name))
 
 

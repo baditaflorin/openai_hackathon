@@ -475,6 +475,32 @@ document.addEventListener("DOMContentLoaded", () => {
     toggle();
   }
 
+  function initSettingsVisibility() {
+    const transcriptionSelect = document.querySelector("[data-settings-selector='transcription']");
+    const contentSelect = document.querySelector("[data-settings-selector='content']");
+    if (!transcriptionSelect && !contentSelect) {
+      return;
+    }
+
+    const setGroupVisibility = (groupName, shouldShow) => {
+      document.querySelectorAll(`[data-settings-group='${groupName}']`).forEach((group) => {
+        group.classList.toggle("is-hidden", !shouldShow);
+      });
+    };
+
+    const refresh = () => {
+      const transcriptionBackend = transcriptionSelect?.value || "auto";
+      const contentBackend = contentSelect?.value || "auto";
+      setGroupVisibility("local-whisper", transcriptionBackend === "auto" || transcriptionBackend === "local-whisper");
+      setGroupVisibility("openai-content", contentBackend === "auto" || contentBackend === "openai");
+      setGroupVisibility("ollama", contentBackend === "ollama");
+    };
+
+    transcriptionSelect?.addEventListener("change", refresh);
+    contentSelect?.addEventListener("change", refresh);
+    refresh();
+  }
+
   function initRecordingControls() {
     const recordControls = document.getElementById("record_controls");
     const screenButton = document.getElementById("record_screen_btn");
@@ -545,6 +571,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initBusyForms();
   initUploadWorkspace();
   initCadenceToggle();
+  initSettingsVisibility();
   initRecordingControls();
   initExistingRecordPollers();
 });

@@ -27,3 +27,4 @@ This directory stores Architecture Decision Records (ADRs) for durable technical
 - [ADR 0007: Progressive enhancement for long-running UI flows](./0007-progressive-enhancement-for-long-running-ui-flows.md)
 - [ADR 0008: Accessibility and performance quality gates](./0008-accessibility-and-performance-quality-gates.md)
 - [ADR 0009: Prompt engine for versioned content generation](./0009-prompt-engine-for-versioned-content-generation.md)
+- [ADR 0010: Runtime settings and provider credentials for local and cloud execution](./0010-runtime-settings-and-provider-credentials.md)

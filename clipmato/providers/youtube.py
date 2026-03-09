@@ -7,13 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from ..config import (
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
     UPLOAD_DIR,
     YOUTUBE_DEFAULT_PRIVACY_STATUS,
     YOUTUBE_OAUTH_STATE_PATH,
     YOUTUBE_PROFILE_PATH,
     YOUTUBE_TOKEN_PATH,
+)
+from ..runtime import (
+    get_google_oauth_client_id,
+    get_google_oauth_client_secret,
 )
 from .base import (
     PublishAuthorizationError,
@@ -62,7 +64,7 @@ class YouTubePublisher:
             return False
 
     def is_configured(self) -> bool:
-        return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and self.dependencies_installed())
+        return bool(get_google_oauth_client_id() and get_google_oauth_client_secret() and self.dependencies_installed())
 
     def missing_configuration_message(self) -> str:
         if not self.dependencies_installed():
@@ -71,12 +73,12 @@ class YouTubePublisher:
                 "`google-api-python-client`, `google-auth-oauthlib`, and related Google auth packages."
             )
         missing: list[str] = []
-        if not GOOGLE_CLIENT_ID:
+        if not get_google_oauth_client_id():
             missing.append("GOOGLE_CLIENT_ID")
-        if not GOOGLE_CLIENT_SECRET:
+        if not get_google_oauth_client_secret():
             missing.append("GOOGLE_CLIENT_SECRET")
         if missing:
-            return "Set " + ", ".join(missing) + " to enable YouTube publishing."
+            return "Save Google OAuth credentials in Settings or set " + ", ".join(missing) + " to enable YouTube publishing."
         return ""
 
     def get_connection_status(self, redirect_uri: str | None = None) -> dict[str, Any]:
@@ -85,7 +87,7 @@ class YouTubePublisher:
             "provider": self.key,
             "name": self.name,
             "available": self.is_configured(),
-            "configured": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
+            "configured": bool(get_google_oauth_client_id() and get_google_oauth_client_secret()),
             "dependencies_installed": self.dependencies_installed(),
             "connected": False,
             "channel_id": profile.get("channel_id"),
@@ -264,8 +266,8 @@ class YouTubePublisher:
         flow = Flow.from_client_config(
             {
                 "web": {
-                    "client_id": GOOGLE_CLIENT_ID,
-                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "client_id": get_google_oauth_client_id(),
+                    "client_secret": get_google_oauth_client_secret(),
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
                     "redirect_uris": [redirect_uri],

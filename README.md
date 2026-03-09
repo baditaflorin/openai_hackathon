@@ -2,7 +2,7 @@
 
 This repository contains a minimal prototype of Clipmato—an automated production pipeline built with the OpenAI Agents SDK.
 
-Current release: `0.2.0`
+Current release: `0.3.0`
 
 ## Components
 - **Content Curator Agent** – Suggests topics and guests.
@@ -223,14 +223,39 @@ The following console commands are installed:
 Clipmato now supports separate backends for transcription and content generation:
 
 - `CLIPMATO_TRANSCRIPTION_BACKEND`: `auto`, `openai`, or `local-whisper`
-- `CLIPMATO_CONTENT_BACKEND`: `auto`, `openai`, or `local`
+- `CLIPMATO_CONTENT_BACKEND`: `auto`, `openai`, `local-basic`, or `ollama`
 - `CLIPMATO_LOCAL_WHISPER_MODEL`: Whisper model name for local transcription, default `base`
 - `CLIPMATO_LOCAL_WHISPER_DEVICE`: `auto`, `mps`, `cuda`, or `cpu`
+- `CLIPMATO_OLLAMA_BASE_URL`: Ollama server base URL, default `http://localhost:11434`
+- `CLIPMATO_OLLAMA_MODEL`: Ollama model name for generation, default `llama3.2:3b`
+- `CLIPMATO_OLLAMA_TIMEOUT_SECONDS`: Ollama request timeout, default `60`
+- `CLIPMATO_OPENAI_CONTENT_MODEL`: OpenAI model used for content generation
+- `CLIPMATO_BASE_URL`: public base URL used to build OAuth callback URLs
 
 Defaults:
 
 - transcription uses `openai` when `OPENAI_API_KEY` is set, otherwise it tries local Whisper if installed
 - content generation uses OpenAI when `OPENAI_API_KEY` is set, otherwise it falls back to local basic summaries/titles/entities/script output
+
+### Settings UI
+
+Clipmato now exposes a dedicated settings page at `/settings`.
+
+From there you can:
+
+- choose the transcription backend (`openai` or `local-whisper`)
+- choose the content backend (`openai`, `local-basic`, or `ollama`)
+- save an OpenAI API key for runtime use without exporting it every time
+- save Google OAuth client credentials for YouTube publishing
+- point the app at an Ollama server and choose the model/timeout
+- set the browser-visible base URL used for OAuth callbacks when running behind a proxy or cloud hostname
+
+For self-hosted and Docker runs, saved preferences live in:
+
+- `settings.json` for non-secret runtime preferences
+- `secrets.json` for saved credentials
+
+These files live under the active runtime data directory (`CLIPMATO_DATA_DIR`, `/data` in Docker).
 
 ### Docker
 
@@ -240,33 +265,48 @@ Build and run with Docker Compose:
 docker compose up --build
 ```
 
+Start the optional integrated Ollama service too:
+
+```bash
+docker compose --profile local-ai up --build
+```
+
+Build the web image with local Whisper installed:
+
+```bash
+docker build --build-arg INSTALL_LOCAL_WHISPER=true -t clipmato:0.3.0 .
+```
+
 Run the built image directly from any working directory:
 
 ```bash
-docker build -t clipmato:0.2.0 .
+docker build -t clipmato:0.3.0 .
 docker run --rm -p 8000:8000 \
   -e OPENAI_API_KEY="$OPENAI_API_KEY" \
   -e GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
   -e GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
   -e CLIPMATO_BASE_URL="http://localhost:8000" \
   -v clipmato_data:/data \
-  clipmato:0.2.0
+  clipmato:0.3.0
 ```
 
 Notes:
 
 - The container stores uploads and metadata in `/data`.
+- Saved runtime settings and credentials are also stored in `/data`, so they survive container recreation when the volume is reused.
 - Provider OAuth tokens are also stored under `/data/providers`.
 - `docker-compose.yml` uses a named volume so data persists across restarts.
 - Outside Docker, packaged installs default to `~/.clipmato`; source checkouts keep using `clipmato/uploads` unless `CLIPMATO_DATA_DIR` is set.
 - Docker defaults transcription to the OpenAI backend. If `OPENAI_API_KEY` is missing, the upload form now returns an immediate configuration error instead of failing late in the pipeline.
-- Set `CLIPMATO_BASE_URL` to the browser-visible base URL used for OAuth callbacks.
+- The Compose `local-ai` profile starts an `ollama` container and pulls the configured model automatically.
+- Set `CLIPMATO_INSTALL_LOCAL_WHISPER=true` in Compose when you want the Clipmato image to include local Whisper support.
+- Set `CLIPMATO_BASE_URL` to the browser-visible base URL used for OAuth callbacks, or save it in `/settings`.
 
 ### YouTube Publishing
 
 Clipmato now implements provider-backed publishing with YouTube as the first live target.
 
-Required environment:
+Required environment or saved settings:
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
@@ -283,9 +323,10 @@ Setup flow:
 
 1. Create a Google OAuth client for a web application.
 2. Add the scheduler callback URL as an authorized redirect URI: `CLIPMATO_BASE_URL + /auth/youtube/callback`
-3. Start Clipmato and open `/scheduler`.
-4. Click **Connect YouTube** and complete the OAuth flow.
-5. Pick a title, choose **YouTube** as a publish target, set the publish time, and save.
+3. Save the Google client ID and secret in `/settings`, or provide them as environment variables.
+4. Start Clipmato and open `/settings` or `/scheduler`.
+5. Click **Connect YouTube** and complete the OAuth flow.
+6. Pick a title, choose **YouTube** as a publish target, set the publish time, and save.
 
 Behavior:
 
@@ -302,7 +343,7 @@ For local transcription without API cost, install the optional local-transcripti
 ```bash
 pip install -e '.[local-transcription]'
 export CLIPMATO_TRANSCRIPTION_BACKEND=local-whisper
-export CLIPMATO_CONTENT_BACKEND=local
+export CLIPMATO_CONTENT_BACKEND=local-basic
 clipmato-web
 ```
 

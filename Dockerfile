@@ -1,5 +1,7 @@
 FROM python:3.12-slim
 
+ARG INSTALL_LOCAL_WHISPER=false
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -27,7 +29,7 @@ COPY pyproject.toml README.md requirements.txt LICENSE /app/
 COPY clipmato /app/clipmato
 
 RUN pip install --upgrade pip \
-    && pip install .
+    && if [ "$INSTALL_LOCAL_WHISPER" = "true" ]; then pip install '.[local-transcription]'; else pip install .; fi
 
 RUN groupadd --system clipmato \
     && useradd --system --gid clipmato --create-home --shell /usr/sbin/nologin clipmato \

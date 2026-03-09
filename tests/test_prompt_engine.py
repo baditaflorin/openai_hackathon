@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -47,13 +48,39 @@ class PromptEngineTests(unittest.TestCase):
             record_id="rec-local",
         )
 
-        self.assertEqual(execution.summary["backend"], "local")
+        self.assertEqual(execution.summary["backend"], "local-basic")
         self.assertEqual(execution.summary["prompt_version"], "v1")
         runs = prompts_module.read_prompt_runs(record_id="rec-local", task="title_suggestion")
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0]["record_id"], "rec-local")
         self.assertEqual(runs[0]["status"], "completed")
         self.assertFalse(runs[0]["used_fallback"])
+
+    def test_ollama_prompt_task_uses_saved_endpoint_configuration(self) -> None:
+        os.environ["CLIPMATO_CONTENT_BACKEND"] = "ollama"
+        os.environ["CLIPMATO_OLLAMA_BASE_URL"] = "http://ollama.internal:11434"
+        os.environ["CLIPMATO_OLLAMA_MODEL"] = "llama3.2:3b"
+        reset_clipmato_modules()
+        prompts_module = importlib.import_module("clipmato.prompts")
+
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"response": json.dumps(["One", "Two", "Three", "Four", "Five"])}
+
+        with patch("clipmato.prompts.engine.httpx.post", return_value=response) as post_mock:
+            execution = prompts_module.run_prompt_task_sync(
+                "title_suggestion",
+                {"transcript": "An episode about local AI runtimes."},
+                fallback_output=["Fallback 1", "Fallback 2", "Fallback 3", "Fallback 4", "Fallback 5"],
+                record_id="rec-ollama",
+            )
+
+        self.assertEqual(execution.summary["backend"], "ollama")
+        self.assertEqual(execution.summary["model"], "llama3.2:3b")
+        self.assertFalse(execution.summary["used_fallback"])
+        post_mock.assert_called_once()
+        self.assertEqual(post_mock.call_args.kwargs["timeout"], 60)
+        self.assertEqual(post_mock.call_args.args[0], "http://ollama.internal:11434/api/generate")
 
     def test_prompt_version_override_selects_variant(self) -> None:
         os.environ["CLIPMATO_PROMPT_TITLE_SUGGESTION_VERSION"] = "v1-format-tight"
@@ -78,7 +105,7 @@ class PromptEngineTests(unittest.TestCase):
                             "run_id": "run-title-1",
                             "task": "title_suggestion",
                             "prompt_version": "v1",
-                            "backend": "local",
+                            "backend": "local-basic",
                             "model": "local-basic",
                             "status": "completed",
                             "validation_passed": True,
@@ -121,7 +148,7 @@ class PromptEngineTests(unittest.TestCase):
                             "run_id": "run-title-2",
                             "task": "title_suggestion",
                             "prompt_version": "v1",
-                            "backend": "local",
+                            "backend": "local-basic",
                             "model": "local-basic",
                             "status": "completed",
                             "validation_passed": True,
@@ -133,7 +160,7 @@ class PromptEngineTests(unittest.TestCase):
                             "run_id": "run-description-2",
                             "task": "description_generation",
                             "prompt_version": "v1",
-                            "backend": "local",
+                            "backend": "local-basic",
                             "model": "local-basic",
                             "status": "completed",
                             "validation_passed": True,

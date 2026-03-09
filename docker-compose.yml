@@ -2,7 +2,9 @@ services:
   clipmato:
     build:
       context: .
-    image: clipmato:0.2.0
+      args:
+        INSTALL_LOCAL_WHISPER: "${CLIPMATO_INSTALL_LOCAL_WHISPER:-false}"
+    image: clipmato:0.3.0
     ports:
       - "${CLIPMATO_PORT:-8000}:8000"
     environment:
@@ -12,6 +14,12 @@ services:
       CLIPMATO_DATA_DIR: /data
       CLIPMATO_TRANSCRIPTION_BACKEND: "${CLIPMATO_TRANSCRIPTION_BACKEND:-openai}"
       CLIPMATO_CONTENT_BACKEND: "${CLIPMATO_CONTENT_BACKEND:-auto}"
+      CLIPMATO_LOCAL_WHISPER_MODEL: "${CLIPMATO_LOCAL_WHISPER_MODEL:-base}"
+      CLIPMATO_LOCAL_WHISPER_DEVICE: "${CLIPMATO_LOCAL_WHISPER_DEVICE:-auto}"
+      CLIPMATO_OLLAMA_BASE_URL: "${CLIPMATO_OLLAMA_BASE_URL:-http://ollama:11434}"
+      CLIPMATO_OLLAMA_MODEL: "${CLIPMATO_OLLAMA_MODEL:-llama3.2:3b}"
+      CLIPMATO_OLLAMA_TIMEOUT_SECONDS: "${CLIPMATO_OLLAMA_TIMEOUT_SECONDS:-60}"
+      CLIPMATO_OPENAI_CONTENT_MODEL: "${CLIPMATO_OPENAI_CONTENT_MODEL:-openai-agents-default}"
       CLIPMATO_BASE_URL: "${CLIPMATO_BASE_URL:-http://localhost:8000}"
       CLIPMATO_PUBLISH_POLL_SECONDS: "${CLIPMATO_PUBLISH_POLL_SECONDS:-15}"
       CLIPMATO_PUBLISH_MAX_ATTEMPTS: "${CLIPMATO_PUBLISH_MAX_ATTEMPTS:-3}"
@@ -22,6 +30,33 @@ services:
     volumes:
       - clipmato_data:/data
     restart: unless-stopped
+  ollama:
+    profiles: ["local-ai"]
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+  ollama-pull:
+    profiles: ["local-ai"]
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+      CLIPMATO_OLLAMA_MODEL: "${CLIPMATO_OLLAMA_MODEL:-llama3.2:3b}"
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - >
+        for i in $(seq 1 30); do
+          ollama list >/dev/null 2>&1 && break;
+          sleep 2;
+        done;
+        ollama pull "$${CLIPMATO_OLLAMA_MODEL}"
+    restart: "no"
 
 volumes:
   clipmato_data:
+  ollama_data:

@@ -1,4 +1,3 @@
-import os
 import subprocess
 import math
 import tempfile
@@ -12,13 +11,14 @@ from ..config import (
     AUDIO_ONLY_EXTENSIONS,
     MAX_CHUNK_SIZE_BYTES,
     WHISPER_MODEL,
-    LOCAL_WHISPER_MODEL,
     FFMPEG_SAMPLE_RATE,
     FFMPEG_CHANNELS,
     FFMPEG_AUDIO_CODEC,
 )
 from ..runtime import (
     detect_local_whisper_device,
+    get_local_whisper_model,
+    get_openai_api_key,
     local_whisper_installed,
     resolve_transcription_backend,
 )
@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 
 
 def _openai_client() -> OpenAI:
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    api_key = get_openai_api_key()
     if not api_key:
         raise RuntimeError(
-            "OPENAI_API_KEY is not set. Set it, or use "
+            "No OpenAI API key is configured. Save one in Settings, or use "
             "CLIPMATO_TRANSCRIPTION_BACKEND=local-whisper for host-native transcription."
         )
     return OpenAI(api_key=api_key, base_url="https://api.openai.com/v1")
@@ -174,7 +174,7 @@ def _transcribe_with_openai(src: Path, model: str) -> str:
 
 
 def _transcribe_with_local_whisper(src: Path) -> str:
-    model_name = LOCAL_WHISPER_MODEL
+    model_name = get_local_whisper_model()
     device = detect_local_whisper_device()
     logger.info(
         "transcribe_audio: using local Whisper model '%s' on device '%s'",

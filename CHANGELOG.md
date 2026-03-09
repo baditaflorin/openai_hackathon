@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-09
+
+### Added
+
+- A dedicated `/settings` experience for choosing transcription/content backends, local Whisper preferences, Ollama endpoint/model settings, and the public callback base URL.
+- Saved secret storage for OpenAI API keys and Google OAuth client credentials, separate from episode metadata and prompt ledgers.
+- Docker support for optional local AI services via a `local-ai` Compose profile and a build arg for installing local Whisper directly into the web image.
+- ADR 0010 for runtime settings and provider credentials, now accepted and implemented in `v0.3.0`.
+
+### Changed
+
+- Runtime resolution now prefers saved user settings over environment defaults and uses saved secrets for OpenAI transcription, OpenAI content generation, and Google OAuth setup.
+- YouTube OAuth callback URLs now honor the saved runtime base URL instead of depending only on deployment-time environment configuration.
+- The dashboard runtime snapshot now links directly to the new Settings area and surfaces credential source details more clearly.
+- The header workflow summary cards now stay fully inside the dark hero surface with stronger contrast so the metrics remain readable.
+
 ## [0.2.0] - 2026-03-08
 
 ### Added

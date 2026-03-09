@@ -12,10 +12,12 @@ from .utils.metadata import get_metadata_record, read_metadata, update_metadata,
 from .utils.progress import update_progress, read_progress, enrich_with_progress
 from .services.file_processing import process_file_async
 from .services.publishing import PublishingService
+from .services.runtime_settings import RuntimeSettingsService
 from .services.scheduling import propose_schedule_async
 
 logger = logging.getLogger(__name__)
 publishing_service = PublishingService()
+runtime_settings_service = RuntimeSettingsService()
 
 
 class FileIOService:
@@ -71,6 +73,37 @@ class SchedulingService:
         return await propose_schedule_async(*args, **kwargs)
 
 
+class RuntimeSettingsFacade:
+    """Service for persisted runtime settings and secret storage."""
+
+    def read_user_settings(self):
+        return runtime_settings_service.read_user_settings()
+
+    def read_user_secrets(self, *, include_values: bool = False):
+        return runtime_settings_service.read_user_secrets(include_values=include_values)
+
+    def resolve(self):
+        return runtime_settings_service.resolve_settings()
+
+    def summary(self):
+        return runtime_settings_service.summary()
+
+    def update_user_settings(self, updates: dict):
+        return runtime_settings_service.update_user_settings(updates)
+
+    def update_secrets(self, updates: dict):
+        return runtime_settings_service.update_secrets(updates)
+
+    def delete_secret(self, key: str):
+        return runtime_settings_service.delete_secret(key)
+
+    def get_secret(self, key: str):
+        return runtime_settings_service.get_secret(key)
+
+    def secret_status(self, key: str):
+        return runtime_settings_service.secret_status(key)
+
+
 def get_templates() -> Jinja2Templates:
     """Dependency: Jinja2 templates instance."""
     return TEMPLATES
@@ -104,3 +137,8 @@ def get_scheduling_service() -> SchedulingService:
 def get_publishing_service() -> PublishingService:
     """Dependency: Publishing service singleton."""
     return publishing_service
+
+
+def get_runtime_settings_service() -> RuntimeSettingsFacade:
+    """Dependency: runtime settings facade."""
+    return RuntimeSettingsFacade()
