@@ -14,6 +14,7 @@ from ..steps.audio_editing import edit_audio_async
 from ..steps.distribution import distribute_with_prompt_async
 from ..utils.progress import update_progress
 from ..utils.metadata import append_metadata
+from ..utils.project_context import normalize_project_context
 from ..steps.silence_removal import remove_silence as remove_silence_step
 from typing import Any
 from ..orchestrator import Step, Pipeline
@@ -23,6 +24,7 @@ async def process_file_async(
     filename: str,
     record_id: str | None = None,
     remove_silence: bool = False,
+    project_context: dict[str, Any] | None = None,
 ) -> dict:
     """
     Process an uploaded file through transcription, description & entity extraction,
@@ -38,6 +40,7 @@ async def process_file_async(
         "rec_id": rec_id,
         "file_path": file_path,
         "filename": filename,
+        "project_context": normalize_project_context(project_context),
     }
 
     steps: list[Step] = [
@@ -52,7 +55,7 @@ async def process_file_async(
         Step(
             "descriptions",
             generate_descriptions_with_prompt_async,
-            input_keys=["transcript", "rec_id"],
+            input_keys=["transcript", "project_context", "rec_id"],
             output_keys=["desc", "desc_prompt_run"],
         ),
         Step(
@@ -64,13 +67,13 @@ async def process_file_async(
         Step(
             "titles",
             propose_titles_with_prompt_async,
-            input_keys=["transcript", "rec_id"],
+            input_keys=["transcript", "project_context", "rec_id"],
             output_keys=["titles", "titles_prompt_run"],
         ),
         Step(
             "script",
             generate_script_with_prompt_async,
-            input_keys=["transcript", "rec_id"],
+            input_keys=["transcript", "project_context", "rec_id"],
             output_keys=["script", "script_prompt_run"],
         ),
         Step(
@@ -96,7 +99,7 @@ async def process_file_async(
         Step(
             "distribution",
             distribute_with_prompt_async,
-            input_keys=["edited_audio", "rec_id"],
+            input_keys=["edited_audio", "project_context", "rec_id"],
             output_keys=["distribution", "distribution_prompt_run"],
         )
     )
@@ -111,6 +114,7 @@ async def process_file_async(
             "id": rec_id,
             "filename": filename,
             "upload_time": datetime.now(UTC).isoformat(),
+            "project_context": context["project_context"],
             "transcript": context["transcript"],
             "titles": context["titles"],
             "selected_title": None,
@@ -147,6 +151,7 @@ async def process_file_async(
             "id": rec_id,
             "filename": filename,
             "upload_time": datetime.now(UTC).isoformat(),
+            "project_context": context["project_context"],
             "error": err_msg,
             "schedule_time": None,
             "publish_targets": [],

@@ -9,7 +9,7 @@
       "status": "active",
       "created_at": "2026-03-08",
       "system_instructions": "You are a podcast assistant that creates both a short and a long description for a given transcript. Respond ONLY with a JSON object with the keys \"short_description\" and \"long_description\". The short description should be one sentence. The long description should be a 3-4 sentence paragraph. Do not include any other text or explanations.",
-      "user_template": "Transcript:\n{transcript}",
+      "user_template": "{project_prompt_prefix}\n{project_context_block}\nTranscript:\n{transcript}\n{project_prompt_suffix}",
       "output_contract": {
         "type": "json_object",
         "required_keys": ["short_description", "long_description"],

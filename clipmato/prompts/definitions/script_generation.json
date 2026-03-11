@@ -9,7 +9,7 @@
       "status": "active",
       "created_at": "2026-03-08",
       "system_instructions": "You create concise show notes and interview questions for the provided topic or transcript. Return a short paragraph followed by three questions.",
-      "user_template": "Source material:\n{transcript}",
+      "user_template": "{project_prompt_prefix}\n{project_context_block}\nSource material:\n{transcript}\n{project_prompt_suffix}",
       "output_contract": {
         "type": "text",
         "min_length": 60,

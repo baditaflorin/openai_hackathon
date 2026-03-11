@@ -50,3 +50,17 @@ def test_runtime_settings_secrets_prefer_saved_values_and_fall_back_to_env(monke
     if os.name != "nt":
         mode = (tmp_path / "secrets.json").stat().st_mode & 0o777
         assert mode == 0o600
+
+
+def test_apply_local_offline_profile_sets_whisper_and_ollama_defaults(tmp_path: Path) -> None:
+    service = RuntimeSettingsService(
+        settings_path=tmp_path / "settings.json",
+        secrets_path=tmp_path / "secrets.json",
+    )
+
+    resolved = service.apply_runtime_profile("local-offline")
+
+    assert resolved["transcription_backend"] == "local-whisper"
+    assert resolved["content_backend"] == "ollama"
+    assert resolved["ollama_model"] == "gpt-oss:20b"
+    assert resolved["ollama_timeout_seconds"] == 120

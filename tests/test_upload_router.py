@@ -20,7 +20,12 @@ def build_app(file_io_service):
     app = FastAPI()
     app.include_router(router)
     # Override only the file IO service; other dependencies use lightweight fallbacks
-    from clipmato.dependencies import get_file_io_service, get_processing_service, get_progress_service
+    from clipmato.dependencies import (
+        get_file_io_service,
+        get_processing_service,
+        get_progress_service,
+        get_project_preset_service,
+    )
 
     class DummyProcessing:
         async def process(self, *args, **kwargs):
@@ -33,9 +38,14 @@ def build_app(file_io_service):
         def read(self, record_id):
             return {"stage": "pending", "progress": 0}
 
+    class DummyProjectPresets:
+        def merge_context(self, preset_ids, manual_context):
+            return manual_context
+
     app.dependency_overrides[get_file_io_service] = lambda: file_io_service
     app.dependency_overrides[get_processing_service] = lambda: DummyProcessing()
     app.dependency_overrides[get_progress_service] = lambda: DummyProgress()
+    app.dependency_overrides[get_project_preset_service] = lambda: DummyProjectPresets()
     return app
 
 

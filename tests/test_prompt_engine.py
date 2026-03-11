@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
 import os
@@ -55,6 +56,33 @@ class PromptEngineTests(unittest.TestCase):
         self.assertEqual(runs[0]["record_id"], "rec-local")
         self.assertEqual(runs[0]["status"], "completed")
         self.assertFalse(runs[0]["used_fallback"])
+
+    def test_local_prompt_task_persists_project_context_inputs(self) -> None:
+        title_step_module = importlib.import_module("clipmato.steps.title_suggestion")
+
+        async def run_step() -> tuple[list[str], dict[str, object]]:
+            return await title_step_module.propose_titles_with_prompt_async(
+                "A transcript about map editing workflows.",
+                {
+                    "project_name": "OpenStreetMap Deep Dives",
+                    "project_summary": "Explain practical mapping workflows for contributors.",
+                    "project_topics": "mapping, open data",
+                    "project_prompt_prefix": "Favor clear, builder-focused framing.",
+                    "project_prompt_suffix": "End with a sense of practical usefulness.",
+                },
+                "rec-project",
+            )
+
+        _, summary = asyncio.run(run_step())
+
+        self.assertEqual(summary["task"], "title_suggestion")
+        prompts_module = importlib.import_module("clipmato.prompts")
+        runs = prompts_module.read_prompt_runs(record_id="rec-project", task="title_suggestion")
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0]["inputs"]["project_name"], "OpenStreetMap Deep Dives")
+        self.assertEqual(runs[0]["inputs"]["project_topics"], "mapping, open data")
+        self.assertIn("Project context:", runs[0]["inputs"]["project_context_block"])
+        self.assertIn("Favor clear, builder-focused framing.", runs[0]["rendered_prompt"])
 
     def test_ollama_prompt_task_uses_saved_endpoint_configuration(self) -> None:
         os.environ["CLIPMATO_CONTENT_BACKEND"] = "ollama"

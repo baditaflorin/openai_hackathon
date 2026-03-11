@@ -13,7 +13,9 @@ Current release: `0.3.0`
 ## Usage
 ### Authentication
 
-Make sure you have your OpenAI API key set in your environment:
+OpenAI is optional. For a fully local run, you do not need an API key.
+
+If you want the OpenAI-backed path instead:
 
 ```bash
 export OPENAI_API_KEY="your_openai_api_key_here"
@@ -181,6 +183,46 @@ python -m clipmato.gui
 
 ### Web Application
 
+### Fully Local Offline Setup
+
+For a host-native end-to-end run with local Whisper and Ollama on macOS:
+
+```bash
+brew install ffmpeg ollama
+ollama serve
+ollama pull mistral-nemo:12b-instruct-2407-q3_K_S
+pip install -r requirements.txt
+pip install -e '.[local-transcription]'
+
+clipmato-web \
+  --host-native \
+  --whisper-model medium \
+  --whisper-device mps \
+  --ollama-model mistral-nemo:12b-instruct-2407-q3_K_S
+```
+
+This path runs Whisper on Apple Metal and points content generation at the host-native Ollama daemon on `http://localhost:11434`.
+
+If you prefer a shorter reusable entrypoint, use:
+
+```bash
+chmod +x scripts/run_host_native.sh
+scripts/run_host_native.sh
+scripts/run_host_native.sh --whisper-model large
+```
+
+Useful launch-time overrides:
+
+```bash
+clipmato-web --host-native --whisper-model large
+clipmato-web --host-native --whisper-model medium --ollama-model mistral-nemo
+clipmato-web --host-native --whisper-model small --port 8010 --reload
+```
+
+The Settings page still lets you change the saved runtime later, but the CLI launch flags are now the fastest host-native path.
+
+### Web Application
+
 You can also run a FastAPI-based web interface for drag-and-drop file upload and processing. The home page (Episode Dashboard) displays all your episodes as responsive cards—click any card to view its detailed transcript, short & long descriptions, and extracted entities.
 
 ```bash
@@ -227,8 +269,10 @@ Clipmato now supports separate backends for transcription and content generation
 - `CLIPMATO_LOCAL_WHISPER_MODEL`: Whisper model name for local transcription, default `base`
 - `CLIPMATO_LOCAL_WHISPER_DEVICE`: `auto`, `mps`, `cuda`, or `cpu`
 - `CLIPMATO_OLLAMA_BASE_URL`: Ollama server base URL, default `http://localhost:11434`
-- `CLIPMATO_OLLAMA_MODEL`: Ollama model name for generation, default `llama3.2:3b`
-- `CLIPMATO_OLLAMA_TIMEOUT_SECONDS`: Ollama request timeout, default `60`
+- `CLIPMATO_OLLAMA_MODEL`: Ollama model name for generation, default `mistral-nemo:12b-instruct-2407-q3_K_S`
+- `clipmato-web --whisper-model <name>`: choose the Whisper checkpoint at launch time
+- `clipmato-web --host-native --whisper-device mps`: force host-native Apple GPU transcription
+- `CLIPMATO_OLLAMA_TIMEOUT_SECONDS`: Ollama request timeout, default `120`
 - `CLIPMATO_OPENAI_CONTENT_MODEL`: OpenAI model used for content generation
 - `CLIPMATO_BASE_URL`: public base URL used to build OAuth callback URLs
 
@@ -245,6 +289,7 @@ From there you can:
 
 - choose the transcription backend (`openai` or `local-whisper`)
 - choose the content backend (`openai`, `local-basic`, or `ollama`)
+- apply a one-click local offline profile for local Whisper + Ollama Mistral NeMo
 - save an OpenAI API key for runtime use without exporting it every time
 - save Google OAuth client credentials for YouTube publishing
 - point the app at an Ollama server and choose the model/timeout
@@ -294,10 +339,12 @@ Notes:
 
 - The container stores uploads and metadata in `/data`.
 - Saved runtime settings and credentials are also stored in `/data`, so they survive container recreation when the volume is reused.
+- Local Whisper and Torch caches are stored under `/data/.cache`, so model downloads are reused across container rebuilds.
 - Provider OAuth tokens are also stored under `/data/providers`.
 - `docker-compose.yml` uses a named volume so data persists across restarts.
+- The Ollama model store lives in the named `ollama_data` volume, and the `ollama-pull` helper now skips pulling when the configured model already exists.
 - Outside Docker, packaged installs default to `~/.clipmato`; source checkouts keep using `clipmato/uploads` unless `CLIPMATO_DATA_DIR` is set.
-- Docker defaults transcription to the OpenAI backend. If `OPENAI_API_KEY` is missing, the upload form now returns an immediate configuration error instead of failing late in the pipeline.
+- Docker Compose now defaults to local Whisper for transcription and Ollama Mistral NeMo for content generation so local/offline testing works with fewer changes.
 - The Compose `local-ai` profile starts an `ollama` container and pulls the configured model automatically.
 - Set `CLIPMATO_INSTALL_LOCAL_WHISPER=true` in Compose when you want the Clipmato image to include local Whisper support.
 - Set `CLIPMATO_BASE_URL` to the browser-visible base URL used for OAuth callbacks, or save it in `/settings`.
@@ -343,7 +390,8 @@ For local transcription without API cost, install the optional local-transcripti
 ```bash
 pip install -e '.[local-transcription]'
 export CLIPMATO_TRANSCRIPTION_BACKEND=local-whisper
-export CLIPMATO_CONTENT_BACKEND=local-basic
+export CLIPMATO_CONTENT_BACKEND=ollama
+export CLIPMATO_OLLAMA_MODEL=mistral-nemo:12b-instruct-2407-q3_K_S
 clipmato-web
 ```
 

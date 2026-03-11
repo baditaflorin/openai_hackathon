@@ -17,6 +17,7 @@ from uuid import uuid4
 from ..dependencies import (
     get_file_io_service,
     get_metadata_service,
+    get_project_preset_service,
     get_processing_service,
     get_progress_service,
     get_templates,
@@ -32,6 +33,7 @@ async def index(
     request: Request,
     templates=Depends(get_templates),
     metadata_svc=Depends(get_metadata_service),
+    project_preset_svc=Depends(get_project_preset_service),
     progress_svc=Depends(get_progress_service),
 ):
     """Serve the upload form and list of processed files."""
@@ -44,6 +46,7 @@ async def index(
         {
             "request": request,
             "records": records,
+            "project_presets": project_preset_svc.read(),
             "runtime_status": runtime_status,
             "app_section": "capture",
             "workflow_metrics": workflow_metrics(records),
@@ -56,7 +59,14 @@ async def upload(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     remove_silence: bool = Form(False),
+    selected_project_presets: list[str] = Form(default=[]),
+    project_name: str = Form(""),
+    project_summary: str = Form(""),
+    project_topics: str = Form(""),
+    project_prompt_prefix: str = Form(""),
+    project_prompt_suffix: str = Form(""),
     file_io=Depends(get_file_io_service),
+    project_preset_svc=Depends(get_project_preset_service),
     processing_svc=Depends(get_processing_service),
     progress_svc=Depends(get_progress_service),
 ) -> JSONResponse:
@@ -79,6 +89,16 @@ async def upload(
         message = f"Local Whisper on {device}"
     else:
         message = "OpenAI Whisper API"
+    merged_project_context = project_preset_svc.merge_context(
+        selected_project_presets,
+        {
+            "project_name": project_name,
+            "project_summary": project_summary,
+            "project_topics": project_topics,
+            "project_prompt_prefix": project_prompt_prefix,
+            "project_prompt_suffix": project_prompt_suffix,
+        },
+    )
     progress_svc.update(record_id, "transcribing", message)
     background_tasks.add_task(
         processing_svc.process,
@@ -86,6 +106,7 @@ async def upload(
         file.filename,
         record_id,
         remove_silence,
+        merged_project_context,
     )
     return JSONResponse({"id": record_id})
 

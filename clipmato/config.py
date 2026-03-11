@@ -5,7 +5,10 @@ uploads directory, metadata file, progress mapping, and default parameters.
 import os
 from pathlib import Path
 
-from fastapi.templating import Jinja2Templates
+try:
+    from fastapi.templating import Jinja2Templates
+except ModuleNotFoundError:  # pragma: no cover - allows non-web service tests without FastAPI installed
+    Jinja2Templates = None  # type: ignore[assignment]
 
 # Base directory of the Clipmato package
 BASE_DIR = Path(__file__).resolve().parent
@@ -15,8 +18,10 @@ DEFAULT_DATA_DIR = (
 )
 
 # Templates and static files
-TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates")) if Jinja2Templates is not None else None
 STATIC_DIR = BASE_DIR / "static"
+STATIC_BUILD_DIR = UPLOAD_DIR / ".static-build"
+STATIC_BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Uploads and metadata paths. Runtime data can live outside the package so
 # packaged installs and containers can persist uploads in a writable volume.
@@ -29,6 +34,7 @@ SETTINGS_PATH = UPLOAD_DIR / "settings.json"
 SECRETS_PATH = UPLOAD_DIR / "secrets.json"
 PROMPT_RUNS_PATH = UPLOAD_DIR / "prompt_runs.jsonl"
 PROMPT_EVALUATIONS_PATH = UPLOAD_DIR / "prompt_evaluations.jsonl"
+PROJECT_PRESETS_PATH = UPLOAD_DIR / "project_presets.json"
 
 ALLOWED_UPLOAD_MIME_TYPES: set[str] = {
     "audio/flac",
@@ -40,6 +46,10 @@ ALLOWED_UPLOAD_MIME_TYPES: set[str] = {
     "audio/wav",
     "audio/webm",
     "audio/x-wav",
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+    "video/x-matroska",
 }
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024  # 50MB limit for uploads
 

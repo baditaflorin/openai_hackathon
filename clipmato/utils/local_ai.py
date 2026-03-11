@@ -17,6 +17,17 @@ STOP_WORDS = {
     "what", "when", "where", "which", "who", "why", "with", "workflows", "would",
     "you", "your",
     "yours",
+    "aceasta", "acest", "această", "aceste", "acolo", "acum", "ai", "ale", "alt",
+    "alta", "alte", "altor", "am", "ar", "asupra", "asta", "astfel", "au", "avea",
+    "avem", "avut", "azi", "ca", "care", "ce", "cel", "cele", "cei", "chiar",
+    "cind", "când", "cu", "cum", "că", "către", "da", "dar", "de", "deja", "din",
+    "dintre", "doar", "după", "ea", "ei", "el", "este", "eu", "fara", "fie",
+    "fiind", "foarte", "fost", "iar", "in", "îi", "îl", "în", "încă", "între",
+    "la", "le", "li", "lor", "lui", "mai", "mea", "mei", "mereu", "mi", "mult",
+    "ne", "ni", "nici", "noi", "nostru", "nu", "orice", "pe", "pentru", "peste",
+    "prin", "sa", "sau", "se", "si", "spre", "sub", "sunt", "să", "te", "toate",
+    "toată", "tot", "toti", "toți", "tu", "un", "una", "unde", "unei", "unii",
+    "unor", "unui", "va", "vă",
 }
 
 LOCATION_HINTS = {"in", "at", "from", "to", "near", "across", "around"}
@@ -48,7 +59,7 @@ def _truncate(text: str, limit: int) -> str:
 def top_keywords(text: str, limit: int = 5, exclude: set[str] | None = None) -> list[str]:
     """Return a few high-frequency keywords from transcript text."""
     excluded = {item.lower() for item in (exclude or set())}
-    words = re.findall(r"\b[a-zA-Z][a-zA-Z'-]{2,}\b", text.lower())
+    words = re.findall(r"[^\W\d_]{3,}", text.lower(), flags=re.UNICODE)
     counts = Counter(word for word in words if word not in STOP_WORDS and word not in excluded)
     return [word for word, _ in counts.most_common(limit)]
 
@@ -87,17 +98,73 @@ def extract_topics_basic(transcript: str, limit: int = 3) -> list[str]:
 
 def describe_transcript_basic(transcript: str) -> dict[str, str]:
     """Create a small local summary without an external model."""
-    sentences = split_sentences(transcript)
-    if not sentences:
+    normalized = normalize_text(transcript)
+    sentences = split_sentences(normalized)
+    if not normalized or not sentences:
         return {
             "short_description": "Transcript available. Local summary could not extract key sentences.",
             "long_description": "Clipmato processed the recording locally, but there was not enough clear transcript text to build a longer summary.",
         }
 
-    short_description = _truncate(sentences[0], 180)
-    long_description = _truncate(" ".join(sentences[:3]), 500)
+    keywords = top_keywords(normalized, limit=6)
+    primary = keywords[:3]
+    secondary = keywords[3:6]
+
+    def format_keywords(values: list[str]) -> str:
+        titled = [value.title() for value in values if value]
+        if not titled:
+            return ""
+        if len(titled) == 1:
+            return titled[0]
+        if len(titled) == 2:
+            return f"{titled[0]} and {titled[1]}"
+        return f"{', '.join(titled[:-1])}, and {titled[-1]}"
+
+    def sentence_topics(sentence: str) -> list[str]:
+        lowered = sentence.lower()
+        return [keyword for keyword in keywords if keyword in lowered]
+
+    ranked_sentences = sorted(
+        sentences,
+        key=lambda sentence: (
+            len(set(sentence_topics(sentence))),
+            sum(normalized.lower().count(keyword) for keyword in sentence_topics(sentence)),
+            -abs(len(sentence) - 160),
+        ),
+        reverse=True,
+    )
+
+    emphasis_phrases: list[str] = []
+    seen_phrase_keys: set[str] = set()
+    for sentence in ranked_sentences:
+        topics = sentence_topics(sentence)
+        if not topics:
+            continue
+        phrase = format_keywords(topics[:3])
+        key = phrase.casefold()
+        if phrase and key not in seen_phrase_keys:
+            emphasis_phrases.append(phrase)
+            seen_phrase_keys.add(key)
+        if len(emphasis_phrases) >= 2:
+            break
+
+    if primary:
+        short_description = f"This clip focuses on {format_keywords(primary)}."
+    else:
+        short_description = "This clip captures a spoken update built from the recovered transcript."
+
+    long_parts = [short_description]
+    if emphasis_phrases:
+        long_parts.append(f"The discussion keeps returning to {emphasis_phrases[0]}.")
+    if len(emphasis_phrases) > 1:
+        long_parts.append(f"It also touches on {emphasis_phrases[1]}.")
+    elif secondary:
+        long_parts.append(f"Additional themes include {format_keywords(secondary[:2])}.")
+
+    long_parts.append("This summary was generated from the transcript fallback path, so review the wording before publishing.")
+    long_description = _truncate(" ".join(long_parts), 500)
     return {
-        "short_description": short_description,
+        "short_description": _truncate(short_description, 220),
         "long_description": long_description,
     }
 

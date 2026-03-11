@@ -8,8 +8,15 @@
 
 {% block page_intro %}
 <p class="page-intro">
+  {% if record.display_title_helper %}
+  {{ record.display_title_helper }}
+  {% else %}
   Review the transcript, lock the title, and move this episode forward into scheduling and publishing without leaving the record.
+  {% endif %}
 </p>
+{% if record.display_subtitle_helper %}
+<p class="helper-copy mb-0">{{ record.display_subtitle_helper }}</p>
+{% endif %}
 {% endblock %}
 
 {% block hero_aside %}
@@ -140,6 +147,24 @@
   </section>
 
   <section class="content-grid">
+    {% if record.project_context %}
+    <article class="workflow-surface content-panel">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Project</p>
+          <h2 class="section-title">Shared context and hooks</h2>
+        </div>
+      </div>
+      <div class="metadata-list">
+        <div><span>Name</span><strong>{{ record.project_context.project_name or 'Not set' }}</strong></div>
+        <div><span>Summary</span><strong>{{ record.project_context.project_summary or 'Not set' }}</strong></div>
+        <div><span>Topics</span><strong>{{ record.project_context.project_topics|join(', ') or 'Not set' }}</strong></div>
+        <div><span>Pre-hook</span><strong>{{ record.project_context.project_prompt_prefix or 'Not set' }}</strong></div>
+        <div><span>Post-hook</span><strong>{{ record.project_context.project_prompt_suffix or 'Not set' }}</strong></div>
+      </div>
+    </article>
+    {% endif %}
+
     <article class="workflow-surface content-panel">
       <div class="section-heading section-heading--compact">
         <div>
@@ -156,6 +181,12 @@
             · {{ prompt_run.backend }}
             {% if prompt_run.used_fallback %}· fallback{% endif %}
           </strong>
+          {% if prompt_run.used_fallback and prompt_run.fallback_reason %}
+          <p class="helper-copy mb-0">Reason: {{ prompt_run.fallback_reason }}</p>
+          {% endif %}
+          {% if prompt_run.issues %}
+          <p class="helper-copy mb-0">{{ prompt_run.issues[0] }}</p>
+          {% endif %}
         </div>
         {% endfor %}
       </div>

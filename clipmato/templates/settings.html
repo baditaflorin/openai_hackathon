@@ -38,6 +38,11 @@
       <small>requested: {{ runtime_status.requested_content_backend }}</small>
     </div>
     <div>
+      <span>Ollama</span>
+      <strong>{{ 'reachable' if runtime_status.ollama_reachable else 'unreachable' }}</strong>
+      <small>{{ runtime_status.ollama_model }}</small>
+    </div>
+    <div>
       <span>OpenAI key</span>
       <strong>{{ 'configured' if runtime_status.openai_api_key_configured else 'missing' }}</strong>
       <small>{{ runtime_status.secret_status.openai_api_key.source }}</small>
@@ -93,75 +98,169 @@
         </div>
       </div>
 
-      <div class="settings-form-grid">
-        <div class="form-cluster">
-          <label class="form-label" for="transcription_backend">Transcription backend</label>
-          <select class="form-select" id="transcription_backend" name="transcription_backend" data-settings-selector="transcription">
-            <option value="auto" {% if settings_summary.transcription_backend == 'auto' %}selected{% endif %}>Auto</option>
-            <option value="openai" {% if settings_summary.transcription_backend == 'openai' %}selected{% endif %}>OpenAI Whisper API</option>
-            <option value="local-whisper" {% if settings_summary.transcription_backend == 'local-whisper' %}selected{% endif %}>Local Whisper</option>
-          </select>
-          <p class="helper-copy">Effective source: {{ source_pill(settings_summary.settings_sources.transcription_backend) }}</p>
-        </div>
-
-        <div class="form-cluster">
-          <label class="form-label" for="content_backend">Content backend</label>
-          <select class="form-select" id="content_backend" name="content_backend" data-settings-selector="content">
-            <option value="auto" {% if settings_summary.content_backend == 'auto' %}selected{% endif %}>Auto</option>
-            <option value="openai" {% if settings_summary.content_backend == 'openai' %}selected{% endif %}>OpenAI</option>
-            <option value="ollama" {% if settings_summary.content_backend == 'ollama' %}selected{% endif %}>Ollama</option>
-            <option value="local-basic" {% if settings_summary.content_backend == 'local-basic' %}selected{% endif %}>Local basic</option>
-          </select>
-          <p class="helper-copy">Effective source: {{ source_pill(settings_summary.settings_sources.content_backend) }}</p>
-        </div>
-
-        <div class="form-cluster">
-          <label class="form-label" for="public_base_url">Public base URL</label>
-          <input class="form-control" id="public_base_url" name="public_base_url" type="url" value="{{ settings_summary.public_base_url }}" placeholder="https://clipmato.example.com">
-          <p class="helper-copy">Used to build OAuth callback URLs when Clipmato is behind a proxy or cloud hostname.</p>
-        </div>
-
-        <div class="form-cluster" data-settings-group="openai-content">
-          <label class="form-label" for="openai_content_model">OpenAI content model</label>
-          <input class="form-control" id="openai_content_model" name="openai_content_model" type="text" value="{{ settings_summary.openai_content_model }}" placeholder="gpt-4.1-mini">
-          <p class="helper-copy">Used for prompt-driven titles, descriptions, entities, and script generation.</p>
-        </div>
-
-        <div class="form-cluster" data-settings-group="local-whisper">
-          <label class="form-label" for="local_whisper_model">Local Whisper model</label>
-          <input class="form-control" id="local_whisper_model" name="local_whisper_model" type="text" value="{{ settings_summary.local_whisper_model }}" placeholder="base">
-          <p class="helper-copy">Examples: <code>base</code>, <code>small</code>, <code>medium</code>.</p>
-        </div>
-
-        <div class="form-cluster" data-settings-group="local-whisper">
-          <label class="form-label" for="local_whisper_device">Local Whisper device</label>
-          <select class="form-select" id="local_whisper_device" name="local_whisper_device">
-            <option value="auto" {% if settings_summary.local_whisper_device == 'auto' %}selected{% endif %}>Auto</option>
-            <option value="mps" {% if settings_summary.local_whisper_device == 'mps' %}selected{% endif %}>Apple Metal (mps)</option>
-            <option value="cuda" {% if settings_summary.local_whisper_device == 'cuda' %}selected{% endif %}>CUDA</option>
-            <option value="cpu" {% if settings_summary.local_whisper_device == 'cpu' %}selected{% endif %}>CPU</option>
-          </select>
-          <p class="helper-copy">Host-native runs can use Apple <code>mps</code>; Docker Desktop on macOS cannot.</p>
-        </div>
-
-        <div class="form-cluster" data-settings-group="ollama">
-          <label class="form-label" for="ollama_base_url">Ollama base URL</label>
-          <input class="form-control" id="ollama_base_url" name="ollama_base_url" type="url" value="{{ settings_summary.ollama_base_url }}" placeholder="http://localhost:11434">
-          <p class="helper-copy">Point Clipmato at a host Ollama instance or the Compose-managed <code>ollama</code> service.</p>
-        </div>
-
-        <div class="form-cluster" data-settings-group="ollama">
-          <label class="form-label" for="ollama_model">Ollama model</label>
-          <input class="form-control" id="ollama_model" name="ollama_model" type="text" value="{{ settings_summary.ollama_model }}" placeholder="llama3.2:3b">
-          <p class="helper-copy">The model name passed to <code>/api/generate</code>.</p>
-        </div>
-
-        <div class="form-cluster" data-settings-group="ollama">
-          <label class="form-label" for="ollama_timeout_seconds">Ollama timeout (seconds)</label>
-          <input class="form-control" id="ollama_timeout_seconds" name="ollama_timeout_seconds" type="number" min="5" value="{{ settings_summary.ollama_timeout_seconds }}">
-          <p class="helper-copy">Longer generations may need a higher timeout.</p>
-        </div>
+      <div class="action-row">
+        <button formaction="/settings/runtime/profile/local-offline" type="submit" class="btn btn-secondary" data-busy-label="Applying local profile...">Apply local offline profile</button>
+        <button formaction="/settings/runtime/profile/apple-host-ollama" type="submit" class="btn btn-outline-secondary" data-busy-label="Applying Apple host profile...">Use Mac Ollama GPU</button>
+        <button formaction="/settings/runtime/profile/gpt-oss-high-memory" type="submit" class="btn btn-outline-secondary" data-busy-label="Applying gpt-oss profile...">Use gpt-oss:20b</button>
+        <button formaction="/settings/runtime/profile/openai-cloud" type="submit" class="btn btn-outline-secondary" data-busy-label="Applying OpenAI profile...">Apply OpenAI profile</button>
       </div>
+      <p class="helper-copy">The local offline profile now uses <code>mistral-nemo:12b-instruct-2407-q3_K_S</code>. Use the Apple-host profile for macOS Metal, or the gpt-oss profile only on higher-memory machines.</p>
+
+      <div class="settings-runtime-stack">
+        <section class="settings-runtime-panel">
+          <div class="section-heading section-heading--compact">
+            <div>
+              <p class="section-kicker">Transcription</p>
+              <h2 class="section-subtitle">Whisper runtime</h2>
+            </div>
+          </div>
+          <div class="settings-form-grid">
+            <div class="form-cluster">
+              <label class="form-label" for="transcription_backend">Transcription backend</label>
+              <select class="form-select" id="transcription_backend" name="transcription_backend" data-settings-selector="transcription">
+                <option value="auto" {% if settings_summary.transcription_backend == 'auto' %}selected{% endif %}>Auto</option>
+                <option value="openai" {% if settings_summary.transcription_backend == 'openai' %}selected{% endif %}>OpenAI Whisper API</option>
+                <option value="local-whisper" {% if settings_summary.transcription_backend == 'local-whisper' %}selected{% endif %}>Local Whisper</option>
+              </select>
+              <p class="helper-copy">Choose between the remote OpenAI Whisper API and a host-native Whisper install.</p>
+              <p class="helper-copy">Effective source: {{ source_pill(settings_summary.settings_sources.transcription_backend) }}</p>
+            </div>
+
+            <div class="form-cluster" data-settings-group="local-whisper">
+              <label class="form-label" for="local_whisper_model">Local Whisper model</label>
+              <input class="form-control" id="local_whisper_model" name="local_whisper_model" type="text" list="local_whisper_models" value="{{ settings_summary.local_whisper_model }}" placeholder="base" autocomplete="off">
+              <p class="helper-copy">Autocomplete includes the common host-native Whisper checkpoints.</p>
+            </div>
+
+            <div class="form-cluster" data-settings-group="local-whisper">
+              <label class="form-label" for="local_whisper_device">Local Whisper device</label>
+              <select class="form-select" id="local_whisper_device" name="local_whisper_device">
+                <option value="auto" {% if settings_summary.local_whisper_device == 'auto' %}selected{% endif %}>Auto</option>
+                <option value="mps" {% if settings_summary.local_whisper_device == 'mps' %}selected{% endif %}>Apple Metal (mps)</option>
+                <option value="cuda" {% if settings_summary.local_whisper_device == 'cuda' %}selected{% endif %}>CUDA</option>
+                <option value="cpu" {% if settings_summary.local_whisper_device == 'cpu' %}selected{% endif %}>CPU</option>
+              </select>
+              <p class="helper-copy">Host-native runs can use Apple <code>mps</code>; Docker Desktop on macOS cannot.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-runtime-panel">
+          <div class="section-heading section-heading--compact">
+            <div>
+              <p class="section-kicker">Content generation</p>
+              <h2 class="section-subtitle">Ollama or OpenAI</h2>
+            </div>
+          </div>
+          <div class="settings-form-grid">
+            <div class="form-cluster">
+              <label class="form-label" for="content_backend">Content backend</label>
+              <select class="form-select" id="content_backend" name="content_backend" data-settings-selector="content">
+                <option value="auto" {% if settings_summary.content_backend == 'auto' %}selected{% endif %}>Auto</option>
+                <option value="openai" {% if settings_summary.content_backend == 'openai' %}selected{% endif %}>OpenAI</option>
+                <option value="ollama" {% if settings_summary.content_backend == 'ollama' %}selected{% endif %}>Ollama</option>
+                <option value="local-basic" {% if settings_summary.content_backend == 'local-basic' %}selected{% endif %}>Local basic</option>
+              </select>
+              <p class="helper-copy">Use Ollama for fully local generation, OpenAI for cloud generation, or local basic for no-model fallbacks.</p>
+              <p class="helper-copy">Effective source: {{ source_pill(settings_summary.settings_sources.content_backend) }}</p>
+            </div>
+
+            <div class="form-cluster" data-settings-group="ollama">
+              <label class="form-label" for="ollama_base_url">Ollama base URL</label>
+              <input class="form-control" id="ollama_base_url" name="ollama_base_url" type="url" list="ollama_base_urls" value="{{ settings_summary.ollama_base_url }}" placeholder="http://localhost:11434" autocomplete="off">
+              <p class="helper-copy">Point Clipmato at a host Ollama instance or the Compose-managed <code>ollama</code> service.</p>
+            </div>
+
+            <div class="form-cluster" data-settings-group="ollama">
+              <label class="form-label" for="ollama_model">Ollama model</label>
+              <input class="form-control" id="ollama_model" name="ollama_model" type="text" list="ollama_models" value="{{ settings_summary.ollama_model }}" placeholder="gpt-oss:20b" autocomplete="off">
+              <p class="helper-copy">On smaller Macs, start with the lighter Mistral NeMo quant. Reserve <code>gpt-oss:20b</code> for higher-memory host-native runs.</p>
+            </div>
+
+            <div class="form-cluster" data-settings-group="ollama">
+              <label class="form-label" for="ollama_timeout_seconds">Ollama timeout (seconds)</label>
+              <input class="form-control" id="ollama_timeout_seconds" name="ollama_timeout_seconds" type="number" min="5" value="{{ settings_summary.ollama_timeout_seconds }}">
+              <p class="helper-copy">Large local models often need more time than cloud requests.</p>
+            </div>
+
+            <div class="form-cluster" data-settings-group="openai-content">
+              <label class="form-label" for="openai_content_model">OpenAI content model</label>
+              <input class="form-control" id="openai_content_model" name="openai_content_model" type="text" list="openai_content_models" value="{{ settings_summary.openai_content_model }}" placeholder="gpt-4.1-mini" autocomplete="off">
+              <p class="helper-copy">Used only when the content backend is set to OpenAI.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-runtime-panel">
+          <div class="section-heading section-heading--compact">
+            <div>
+              <p class="section-kicker">Appearance</p>
+              <h2 class="section-subtitle">Theme</h2>
+            </div>
+          </div>
+          <div class="settings-form-grid">
+            <div class="form-cluster">
+              <label class="form-label" for="theme_preference">Theme preference</label>
+              <select class="form-select" id="theme_preference" data-theme-preference>
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+              <p class="helper-copy">Saved in this browser. Header toggle and settings stay in sync.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-runtime-panel">
+          <div class="section-heading section-heading--compact">
+            <div>
+              <p class="section-kicker">Callbacks</p>
+              <h2 class="section-subtitle">Public endpoint</h2>
+            </div>
+          </div>
+          <div class="settings-form-grid">
+            <div class="form-cluster">
+              <label class="form-label" for="public_base_url">Public base URL</label>
+              <input class="form-control" id="public_base_url" name="public_base_url" type="url" list="public_base_urls" value="{{ settings_summary.public_base_url }}" placeholder="https://clipmato.example.com" autocomplete="off">
+              <p class="helper-copy">Used to build OAuth callback URLs when Clipmato is behind a proxy or cloud hostname.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <datalist id="local_whisper_models">
+        <option value="tiny"></option>
+        <option value="base"></option>
+        <option value="small"></option>
+        <option value="medium"></option>
+        <option value="large"></option>
+      </datalist>
+
+      <datalist id="ollama_base_urls">
+        <option value="http://localhost:11434"></option>
+        <option value="http://ollama:11434"></option>
+        <option value="http://host.docker.internal:11434"></option>
+      </datalist>
+
+      <datalist id="ollama_models">
+        <option value="mistral-nemo"></option>
+        <option value="mistral-nemo:12b-instruct-2407-q3_K_S"></option>
+        <option value="qwen3:4b"></option>
+        <option value="gpt-oss:20b"></option>
+        <option value="qwen2.5:14b"></option>
+        <option value="mistral-small:24b"></option>
+      </datalist>
+
+      <datalist id="openai_content_models">
+        <option value="gpt-4.1-mini"></option>
+        <option value="gpt-4.1"></option>
+        <option value="gpt-4o-mini"></option>
+      </datalist>
+
+      <datalist id="public_base_urls">
+        <option value="http://localhost:8000"></option>
+        <option value="https://clipmato.example.com"></option>
+      </datalist>
 
       <div class="action-row">
         <button type="submit" class="btn btn-primary" data-busy-label="Saving runtime...">Save runtime settings</button>

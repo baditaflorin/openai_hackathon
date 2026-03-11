@@ -9,7 +9,7 @@
       "status": "active",
       "created_at": "2026-03-08",
       "system_instructions": "You suggest 5 catchy and descriptive podcast episode titles based on the provided transcript. Respond ONLY with a JSON array of strings. Do not include any other text or explanations.",
-      "user_template": "Transcript:\n{transcript}",
+      "user_template": "{project_prompt_prefix}\n{project_context_block}\nTranscript:\n{transcript}\n{project_prompt_suffix}",
       "output_contract": {
         "type": "json_list",
         "count": 5,
@@ -21,7 +21,7 @@
       "status": "experimental",
       "created_at": "2026-03-08",
       "system_instructions": "You write exactly 5 podcast episode titles. Each title must be specific, natural, and publication-ready. Avoid clickbait cliches, numbering, labels, quotation marks, and surrounding commentary. Respond ONLY with a JSON array of 5 strings.",
-      "user_template": "Transcript:\n{transcript}",
+      "user_template": "{project_prompt_prefix}\n{project_context_block}\nTranscript:\n{transcript}\n{project_prompt_suffix}",
       "output_contract": {
         "type": "json_list",
         "count": 5,

@@ -1,12 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-page="{{ app_section or 'app' }}" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Clipmato{% endblock %}</title>
-  <link href="/static/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/style.css" rel="stylesheet">
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="{{ static_asset('style.css') }}" as="style">
+  <link href="{{ static_asset('bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ static_asset('style.css') }}" rel="stylesheet">
+  <link rel="icon" href="{{ static_asset('favicon.svg') }}" type="image/svg+xml">
 </head>
 <body class="app-body">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -25,6 +26,7 @@
           <a href="/scheduler#publish-board" class="workflow-link {% if app_section == 'publish' %}is-active{% endif %}" {% if app_section == 'publish' %}aria-current="page"{% endif %}>Publish</a>
           <a href="/settings" class="workflow-link {% if app_section == 'settings' %}is-active{% endif %}" {% if app_section == 'settings' %}aria-current="page"{% endif %}>Settings</a>
         </nav>
+        <button type="button" class="theme-toggle btn btn-outline-secondary btn-sm" id="theme_toggle" aria-label="Toggle theme">Theme</button>
         <div class="shell-summary" aria-label="Workflow summary">
           <div class="shell-summary__item">
             <span class="shell-summary__label">Episodes</span>
@@ -59,6 +61,7 @@
     </main>
   </div>
   <div id="app-live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
-  <script src="/static/app.js"></script>
+  <script type="module" src="{{ static_asset('app.js') }}"></script>
+  {% block page_scripts %}{% endblock %}
 </body>
 </html>

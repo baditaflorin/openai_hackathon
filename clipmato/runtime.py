@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
+import os
+
+import httpx
 
 from .services.runtime_settings import RuntimeSettingsService
 
@@ -9,6 +13,12 @@ from .services.runtime_settings import RuntimeSettingsService
 TRANSCRIPTION_BACKENDS = {"auto", "openai", "local-whisper"}
 CONTENT_BACKENDS = {"auto", "openai", "local-basic", "ollama"}
 _settings_service = RuntimeSettingsService()
+logger = logging.getLogger(__name__)
+
+
+def running_in_container() -> bool:
+    """Return whether the current process appears to run inside a container."""
+    return os.path.exists("/.dockerenv")
 
 
 def get_runtime_preferences() -> dict[str, object]:
@@ -69,6 +79,20 @@ def get_ollama_model() -> str:
 def get_ollama_timeout_seconds() -> int:
     """Return the resolved Ollama timeout in seconds."""
     return int(get_runtime_preferences()["ollama_timeout_seconds"])
+
+
+def ollama_reachable() -> bool:
+    """Return whether the configured Ollama endpoint responds locally."""
+    base_url = get_ollama_base_url()
+    if not base_url:
+        return False
+    try:
+        response = httpx.get(f"{base_url}/api/tags", timeout=min(get_ollama_timeout_seconds(), 2))
+        response.raise_for_status()
+    except Exception:
+        logger.debug("Ollama endpoint is not reachable at %s", base_url, exc_info=True)
+        return False
+    return True
 
 
 def local_whisper_installed() -> bool:
@@ -139,6 +163,7 @@ def get_runtime_status() -> dict[str, object]:
     preferences = get_runtime_preferences()
     transcription_backend = resolve_transcription_backend()
     content_backend = resolve_content_backend()
+    local_whisper_device = detect_local_whisper_device()
     blockers: list[str] = []
     warnings: list[str] = []
 
@@ -147,6 +172,11 @@ def get_runtime_status() -> dict[str, object]:
             "Local Whisper is selected for transcription, but the optional "
             "dependency is not installed. Install `pip install -e '.[local-transcription]'` "
             "for a host-native run, or switch to the OpenAI backend."
+        )
+    if transcription_backend == "local-whisper" and running_in_container() and local_whisper_device != "cuda":
+        warnings.append(
+            "Clipmato is running inside Docker, so local Whisper cannot use Apple Metal (`mps`). "
+            "In this setup Whisper will run on CPU. For Apple GPU transcription, run `clipmato-web` directly on macOS."
         )
 
     if transcription_backend == "openai" and not has_openai_api_key():
@@ -166,6 +196,11 @@ def get_runtime_status() -> dict[str, object]:
             "Ollama content generation is selected, but the Ollama base URL or model is missing. "
             "Update the runtime settings before processing uploads."
         )
+    if content_backend == "ollama" and not ollama_reachable():
+        blockers.append(
+            "Ollama content generation is selected, but the configured Ollama server is not reachable. "
+            "Start Ollama locally and pull the selected model before running offline."
+        )
 
     if content_backend == "local-basic":
         warnings.append(
@@ -176,6 +211,19 @@ def get_runtime_status() -> dict[str, object]:
     if content_backend == "ollama":
         warnings.append(
             f"Content generation is routed to Ollama at {get_ollama_base_url()} using `{get_ollama_model()}`."
+        )
+        if get_ollama_base_url().startswith("http://ollama:"):
+            warnings.append(
+                "The Compose-managed Ollama service runs in Linux and will not use Apple Metal. "
+                "For Apple GPU acceleration, run Ollama on macOS and point Clipmato at `http://host.docker.internal:11434`."
+            )
+        if get_ollama_model() == "gpt-oss:20b":
+            warnings.append(
+                "`gpt-oss:20b` is a high-memory model. If generation keeps falling back, switch to a smaller Ollama target like `mistral-nemo:12b-instruct-2407-q3_K_S` on 8 GB-class Macs."
+            )
+    if transcription_backend == "local-whisper":
+        warnings.append(
+            f"Transcription is configured for local Whisper using `{get_local_whisper_model()}` on `{local_whisper_device}`."
         )
 
     secret_status = {
@@ -192,11 +240,13 @@ def get_runtime_status() -> dict[str, object]:
         "content_backend": content_backend,
         "local_whisper_installed": local_whisper_installed(),
         "local_whisper_model": get_local_whisper_model(),
-        "local_whisper_device": detect_local_whisper_device(),
+        "local_whisper_device": local_whisper_device,
+        "running_in_container": running_in_container(),
         "openai_content_model": get_openai_content_model(),
         "ollama_base_url": get_ollama_base_url(),
         "ollama_model": get_ollama_model(),
         "ollama_timeout_seconds": get_ollama_timeout_seconds(),
+        "ollama_reachable": ollama_reachable(),
         "public_base_url": get_public_base_url(),
         "settings_sources": preferences.get("settings_sources", {}),
         "secret_status": secret_status,

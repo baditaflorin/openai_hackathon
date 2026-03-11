@@ -29,11 +29,29 @@ class FrontendPageTests(unittest.TestCase):
         metadata_path.write_text(json.dumps(records, indent=2))
         return metadata_path
 
+    def write_project_presets(self, presets: list[dict]) -> Path:
+        presets_path = Path(self.tempdir.name) / "project_presets.json"
+        presets_path.write_text(json.dumps(presets, indent=2))
+        return presets_path
+
     def load_client(self) -> TestClient:
         app_module = importlib.import_module("clipmato.web")
         return TestClient(app_module.app)
 
     def test_dashboard_record_scheduler_render(self) -> None:
+        self.write_project_presets(
+            [
+                {
+                    "id": "preset-osm",
+                    "label": "OpenStreetMap",
+                    "project_name": "OpenStreetMap Deep Dives",
+                    "project_summary": "Contributor stories and mapping workflows.",
+                    "project_topics": ["mapping", "civic data"],
+                    "project_prompt_prefix": "Keep the framing practical.",
+                    "project_prompt_suffix": "Close with a contributor takeaway.",
+                }
+            ]
+        )
         self.write_metadata(
             [
                 {
@@ -45,6 +63,13 @@ class FrontendPageTests(unittest.TestCase):
                     "selected_title": "Episode 1",
                     "short_description": "Short description",
                     "long_description": "Long description",
+                    "project_context": {
+                        "project_name": "OpenStreetMap Deep Dives",
+                        "project_summary": "Contributor stories and mapping workflows.",
+                        "project_topics": ["mapping", "civic data"],
+                        "project_prompt_prefix": "Keep the framing practical.",
+                        "project_prompt_suffix": "Close with a contributor takeaway.",
+                    },
                     "people": ["Alice"],
                     "locations": ["Berlin"],
                     "schedule_time": "2026-03-09T09:00:00",
@@ -67,6 +92,19 @@ class FrontendPageTests(unittest.TestCase):
         for path in ("/", "/record/rec-1", "/record/rec-1/summary", "/scheduler", "/settings"):
             response = client.get(path)
             self.assertEqual(response.status_code, 200, path)
+        self.assertIn('Saved presets', client.get("/").text)
+        self.assertIn("Browser recording works best on", client.get("/").text)
+        self.assertIn("OpenStreetMap Deep Dives", client.get("/").text)
+        self.assertIn("Topics: mapping, civic data", client.get("/record/rec-1").text)
+
+    def test_dashboard_empty_state_still_renders_records_container(self) -> None:
+        client = self.load_client()
+
+        response = client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="dashboard_empty_state"', response.text)
+        self.assertIn('id="records_container"', response.text)
 
     def test_schedule_route_creates_provider_scoped_job(self) -> None:
         metadata_path = self.write_metadata(
@@ -155,6 +193,21 @@ class FrontendPageTests(unittest.TestCase):
         self.assertEqual(secrets_payload["openai_api_key"], "sk-test-value")
         self.assertEqual(secrets_payload["google_client_id"], "google-client-id")
         self.assertEqual(secrets_payload["google_client_secret"], "google-client-secret")
+
+    def test_local_offline_profile_route_persists_local_runtime_defaults(self) -> None:
+        client = self.load_client()
+
+        response = client.post(
+            "/settings/runtime/profile/local-offline",
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 303)
+
+        settings_payload = json.loads((Path(self.tempdir.name) / "settings.json").read_text())
+        self.assertEqual(settings_payload["transcription_backend"], "local-whisper")
+        self.assertEqual(settings_payload["content_backend"], "ollama")
+        self.assertEqual(settings_payload["ollama_model"], "gpt-oss:20b")
+        self.assertEqual(settings_payload["ollama_timeout_seconds"], 120)
 
     def test_saved_public_base_url_is_used_for_oauth_callback(self) -> None:
         settings_path = Path(self.tempdir.name) / "settings.json"

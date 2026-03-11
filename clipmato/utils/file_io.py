@@ -1,3 +1,4 @@
+import mimetypes
 import re
 from pathlib import Path
 from uuid import uuid4
@@ -15,6 +16,7 @@ upload_dir = UPLOAD_DIR
 upload_dir.mkdir(parents=True, exist_ok=True)
 
 _SAFE_FILENAME_PATTERN = re.compile(r"[^A-Za-z0-9_.-]")
+_GENERIC_CONTENT_TYPES = {"", "application/octet-stream"}
 
 
 def sanitize_filename(filename: str) -> str:
@@ -33,14 +35,40 @@ def generate_unique_filename(filename: str) -> str:
     return f"{base}_{uuid4().hex}{suffix}"
 
 
+def _candidate_content_types(upload_file: UploadFile) -> list[str]:
+    """Return explicit and filename-derived content types for validation."""
+    candidates: list[str] = []
+    explicit = (upload_file.content_type or "").strip().lower()
+    if explicit:
+        candidates.append(explicit)
+
+    guessed, _ = mimetypes.guess_type(upload_file.filename or "")
+    guessed = (guessed or "").strip().lower()
+    if guessed and guessed not in candidates:
+        candidates.append(guessed)
+
+    return candidates
+
+
 def _validate_content_type(upload_file: UploadFile) -> None:
-    """Ensure the uploaded file's MIME type is permitted."""
-    if upload_file.content_type not in ALLOWED_UPLOAD_MIME_TYPES:
-        allowed = ", ".join(sorted(ALLOWED_UPLOAD_MIME_TYPES))
-        raise HTTPException(
-            status_code=415,
-            detail=f"Unsupported media type. Allowed types: {allowed}",
-        )
+    """Ensure the uploaded file's MIME type or extension maps to a permitted type."""
+    candidates = _candidate_content_types(upload_file)
+    if any(candidate in ALLOWED_UPLOAD_MIME_TYPES for candidate in candidates):
+        return
+
+    explicit = (upload_file.content_type or "").strip().lower()
+    suffix = Path(upload_file.filename or "").suffix.lower()
+    if explicit in _GENERIC_CONTENT_TYPES and suffix in {".mp4", ".mov", ".m4a", ".mp3", ".wav", ".ogg", ".opus", ".webm", ".mkv", ".flac"}:
+        return
+
+    allowed = ", ".join(sorted(ALLOWED_UPLOAD_MIME_TYPES))
+    detail = f"Unsupported media type. Allowed types: {allowed}"
+    if explicit:
+        detail += f". Received: {explicit}"
+    raise HTTPException(
+        status_code=415,
+        detail=detail,
+    )
 
 
 def _copy_file_with_limit(upload_file: UploadFile, destination: Path) -> int:

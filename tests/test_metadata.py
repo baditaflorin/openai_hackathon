@@ -13,6 +13,8 @@ def temp_metadata_file(tmp_path, monkeypatch):
     path = Path(tmp_path / "metadata.json")
     monkeypatch.setattr(config, "METADATA_PATH", path, raising=False)
     monkeypatch.setattr(metadata, "metadata_path", path, raising=False)
+    monkeypatch.setattr(metadata, "metadata_lock_path", path.with_suffix(".json.lock"), raising=False)
+    metadata.metadata_cache._snapshot = metadata._MetadataSnapshot(None, None, [])
     return path
 
 
@@ -80,3 +82,15 @@ def test_concurrent_writes_keep_json_valid(temp_metadata_file):
     ids = {rec["id"] for rec in records}
     assert ids == {"keep", "update", "new", "extra"}
     assert next(rec for rec in records if rec["id"] == "update")["value"] == 200
+
+
+def test_read_metadata_invalidates_cache_when_file_changes(temp_metadata_file):
+    temp_metadata_file.write_text(json.dumps([{"id": "one"}], indent=2))
+
+    first = metadata.read_metadata()
+    assert first == [{"id": "one"}]
+
+    temp_metadata_file.write_text(json.dumps([{"id": "two"}], indent=2))
+
+    second = metadata.read_metadata()
+    assert second == [{"id": "two"}]

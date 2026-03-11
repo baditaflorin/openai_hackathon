@@ -54,7 +54,9 @@ SECRET_ENV_MAP = {
     "google_client_secret": GOOGLE_CLIENT_SECRET_ENV_VAR,
 }
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
-DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
+DEFAULT_OLLAMA_MODEL = "mistral-nemo:12b-instruct-2407-q3_K_S"
+HIGH_MEMORY_OLLAMA_MODEL = "gpt-oss:20b"
+APPLE_HOST_OLLAMA_BASE_URL = "http://host.docker.internal:11434"
 DEFAULT_OPENAI_CONTENT_MODEL = (
     os.getenv(OPENAI_CONTENT_MODEL_ENV_VAR, "").strip()
     or os.getenv("OPENAI_MODEL", "").strip()
@@ -134,7 +136,8 @@ def _normalize_setting_value(key: str, value: Any) -> Any:
     if key == "ollama_base_url":
         return _normalized_url(value) or DEFAULT_OLLAMA_BASE_URL
     if key == "ollama_model":
-        return _normalized_text(value) or DEFAULT_OLLAMA_MODEL
+        model = _normalized_text(value) or DEFAULT_OLLAMA_MODEL
+        return HIGH_MEMORY_OLLAMA_MODEL if model == "gpt-oss-20b" else model
     if key == "ollama_timeout_seconds":
         return _normalize_timeout(value)
     if key == "public_base_url":
@@ -249,6 +252,52 @@ class RuntimeSettingsService:
                 current[key] = _normalize_setting_value(key, value)
             _write_json(self.settings_path, current)
         return self.resolve_settings()
+
+    def apply_runtime_profile(self, profile: str) -> dict[str, Any]:
+        """Apply a named runtime profile for local or cloud-first execution."""
+        normalized = _normalized_text(profile).lower()
+        defaults, _ = _runtime_defaults_from_env()
+        if normalized == "local-offline":
+            return self.update_user_settings(
+                {
+                    "transcription_backend": "local-whisper",
+                    "content_backend": "ollama",
+                    "local_whisper_model": "base",
+                    "local_whisper_device": "auto",
+                    "ollama_base_url": defaults["ollama_base_url"],
+                    "ollama_model": DEFAULT_OLLAMA_MODEL,
+                    "ollama_timeout_seconds": 120,
+                }
+            )
+        if normalized == "apple-host-ollama":
+            return self.update_user_settings(
+                {
+                    "transcription_backend": "local-whisper",
+                    "content_backend": "ollama",
+                    "local_whisper_model": "base",
+                    "local_whisper_device": "mps",
+                    "ollama_base_url": APPLE_HOST_OLLAMA_BASE_URL,
+                    "ollama_model": DEFAULT_OLLAMA_MODEL,
+                    "ollama_timeout_seconds": 120,
+                }
+            )
+        if normalized == "gpt-oss-high-memory":
+            return self.update_user_settings(
+                {
+                    "content_backend": "ollama",
+                    "ollama_model": HIGH_MEMORY_OLLAMA_MODEL,
+                    "ollama_timeout_seconds": 180,
+                }
+            )
+        if normalized == "openai-cloud":
+            return self.update_user_settings(
+                {
+                    "transcription_backend": "openai",
+                    "content_backend": "openai",
+                    "openai_content_model": DEFAULT_OPENAI_CONTENT_MODEL,
+                }
+            )
+        raise ValueError(f"Unknown runtime profile: {profile}")
 
     def get_secret(self, key: str) -> str:
         """Return a secret from saved storage or environment fallback."""

@@ -10,6 +10,9 @@
     <div>
       <p class="episode-card__eyebrow">Episode</p>
       <h3 class="episode-card__title" data-card-title>{{ rec.display_title }}</h3>
+      {% if rec.display_title_helper %}
+      <p class="episode-card__meta mb-0">{{ rec.display_title_helper }}</p>
+      {% endif %}
     </div>
     {% if rec.youtube_job %}
     <span class="status-pill {% if rec.youtube_job.status == 'published' %}is-success{% elif rec.youtube_job.status in ['scheduled', 'publishing'] %}is-brand{% elif rec.youtube_job.status in ['blocked', 'failed'] %}is-danger{% else %}is-muted{% endif %}">

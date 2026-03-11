@@ -44,6 +44,41 @@ def test_save_upload_file_generates_unique_names(monkeypatch):
     assert second_path.exists()
 
 
+def test_save_upload_file_allows_webm_video(monkeypatch):
+    monkeypatch.setattr(
+        file_io, "ALLOWED_UPLOAD_MIME_TYPES", {"video/webm"}, raising=False
+    )
+    upload = UploadFile(
+        filename="recording.webm",
+        file=BytesIO(b"12345"),
+        headers={"content-type": "video/webm"},
+    )
+
+    saved_path = Path(file_io.save_upload_file(upload))
+
+    assert saved_path.exists()
+    assert saved_path.suffix == ".webm"
+
+
+def test_save_upload_file_allows_generic_octet_stream_when_extension_is_supported(monkeypatch):
+    monkeypatch.setattr(
+        file_io,
+        "ALLOWED_UPLOAD_MIME_TYPES",
+        {"video/mp4"},
+        raising=False,
+    )
+    upload = UploadFile(
+        filename="sample.mp4",
+        file=BytesIO(b"12345"),
+        headers={"content-type": "application/octet-stream"},
+    )
+
+    saved_path = Path(file_io.save_upload_file(upload))
+
+    assert saved_path.exists()
+    assert saved_path.suffix == ".mp4"
+
+
 def test_save_upload_file_rejects_disallowed_mime(monkeypatch):
     monkeypatch.setattr(
         file_io, "ALLOWED_UPLOAD_MIME_TYPES", {"audio/wav"}, raising=False

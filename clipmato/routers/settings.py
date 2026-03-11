@@ -89,6 +89,33 @@ async def save_runtime_settings(
     return _settings_redirect("notice", "Runtime settings saved.")
 
 
+@router.post("/settings/runtime/profile/{profile}")
+async def apply_runtime_profile(
+    profile: str,
+    settings_svc=Depends(get_runtime_settings_service),
+) -> RedirectResponse:
+    """Apply a named runtime profile for quick local/cloud switching."""
+    try:
+        settings_svc.apply_runtime_profile(profile)
+    except ValueError as exc:
+        return _settings_redirect("error", str(exc))
+    if profile == "local-offline":
+        return _settings_redirect(
+            "notice",
+            "Local offline profile applied: local Whisper + Ollama mistral-nemo:12b-instruct-2407-q3_K_S.",
+        )
+    if profile == "apple-host-ollama":
+        return _settings_redirect(
+            "notice",
+            "Apple host Ollama profile applied: local Whisper on mps + host-native Ollama at http://host.docker.internal:11434 using Mistral NeMo.",
+        )
+    if profile == "gpt-oss-high-memory":
+        return _settings_redirect("notice", "High-memory Ollama profile applied: gpt-oss:20b.")
+    if profile == "openai-cloud":
+        return _settings_redirect("notice", "OpenAI cloud profile applied.")
+    return _settings_redirect("notice", "Runtime profile applied.")
+
+
 @router.post("/settings/credentials/openai")
 async def save_openai_credentials(
     request: Request,

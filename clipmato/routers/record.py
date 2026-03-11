@@ -60,6 +60,7 @@ async def record_summary(
             "id": record["id"],
             "filename": record.get("filename"),
             "display_title": record.get("display_title"),
+            "display_title_helper": record.get("display_title_helper"),
             "upload_time": record.get("upload_time"),
             "progress": record.get("progress", 100),
             "stage": record.get("stage", "complete"),

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import tempfile
+from dataclasses import dataclass
 from contextlib import contextmanager
 from typing import Callable, TypeVar
 
@@ -18,6 +19,58 @@ metadata_path = METADATA_PATH
 metadata_lock_path = metadata_path.with_suffix(f"{metadata_path.suffix}.lock")
 logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
+
+
+@dataclass(slots=True)
+class _MetadataSnapshot:
+    mtime_ns: int | None
+    size: int | None
+    records: list[dict]
+
+
+class MetadataCache:
+    """Per-process metadata cache invalidated by file size and mtime."""
+
+    def __init__(self) -> None:
+        self._snapshot = _MetadataSnapshot(mtime_ns=None, size=None, records=[])
+
+    def _stat_signature(self) -> tuple[int | None, int | None]:
+        if not metadata_path.exists():
+            return None, None
+        stat = metadata_path.stat()
+        return stat.st_mtime_ns, stat.st_size
+
+    def _read_from_disk(self) -> list[dict]:
+        records = _read_records_unlocked()
+        self._snapshot = _MetadataSnapshot(
+            mtime_ns=self._stat_signature()[0],
+            size=self._stat_signature()[1],
+            records=records,
+        )
+        return records
+
+    def warm(self) -> None:
+        """Preload metadata into memory."""
+        self.records()
+
+    def records(self) -> list[dict]:
+        """Return a detached record list, reloading when the file changed."""
+        mtime_ns, size = self._stat_signature()
+        if (mtime_ns, size) != (self._snapshot.mtime_ns, self._snapshot.size):
+            self._read_from_disk()
+        return copy.deepcopy(self._snapshot.records)
+
+    def write_through(self, records: list[dict]) -> None:
+        """Update the cache immediately after a successful write."""
+        mtime_ns, size = self._stat_signature()
+        self._snapshot = _MetadataSnapshot(
+            mtime_ns=mtime_ns,
+            size=size,
+            records=copy.deepcopy(records),
+        )
+
+
+metadata_cache = MetadataCache()
 
 
 @contextmanager
@@ -63,12 +116,9 @@ def _atomic_write_records(records: list[dict]) -> None:
 
 def read_metadata() -> list[dict]:
     """Read the metadata file and return a detached list of records."""
-    if not metadata_path.exists():
-        return []
     try:
-        with metadata_path.open("r", encoding="utf-8") as handle:
-            return copy.deepcopy(json.load(handle))
-    except (OSError, json.JSONDecodeError):
+        return metadata_cache.records()
+    except Exception:
         logger.exception("Failed to read metadata; returning empty list")
         return []
 
@@ -81,6 +131,7 @@ def mutate_metadata(mutator: Callable[[list[dict]], _T]) -> _T:
             records = _read_records_unlocked()
             result = mutator(records)
             _atomic_write_records(records)
+            metadata_cache.write_through(records)
             return copy.deepcopy(result)
     except Exception:
         logger.exception("Failed to mutate metadata")

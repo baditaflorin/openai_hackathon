@@ -74,12 +74,16 @@
     </div>
     <div class="capture-layout">
       <div class="capture-panel">
+        <section id="capture_error_banner" class="alert-surface is-danger mb-3" role="alert" hidden>
+          <h3 class="section-subtitle mb-1">Upload failed</h3>
+          <p id="capture_error_message" class="mb-0">The browser could not send this file.</p>
+        </section>
         <div id="drop_zone" class="drop-zone" role="button" tabindex="0" aria-describedby="drop_zone_hint">
           <div class="drop-zone__icon" aria-hidden="true">+</div>
           <p class="drop-zone__title">Drop video or audio here</p>
           <p id="drop_zone_hint" class="drop-zone__hint">MP4, MOV, M4A, MP3, WAV, and similar formats are supported.</p>
           <button id="file_select_btn" class="btn btn-primary" type="button">Choose a file</button>
-          <input type="file" id="file_input" class="visually-hidden" aria-hidden="true">
+          <input type="file" id="file_input" class="visually-hidden" aria-hidden="true" accept="video/*,audio/*">
         </div>
         <label class="option-toggle" for="remove_silence_checkbox">
           <input class="form-check-input" type="checkbox" id="remove_silence_checkbox">
@@ -92,16 +96,105 @@
       <div class="capture-panel">
         <div class="section-heading section-heading--compact">
           <div>
-            <p class="section-kicker">Quick capture</p>
-            <h3 class="section-subtitle">Record in browser</h3>
+            <p class="section-kicker">Project presets</p>
+            <h3 class="section-subtitle">Choose the context before capture</h3>
           </div>
         </div>
-        <div id="record_controls" class="record-actions" aria-label="Recording controls">
+        {% if request.query_params.get('preset_notice') %}
+        <p class="helper-copy">{{ request.query_params.get('preset_notice') }}</p>
+        {% endif %}
+        {% if request.query_params.get('preset_error') %}
+        <p class="helper-copy is-danger">{{ request.query_params.get('preset_error') }}</p>
+        {% endif %}
+        <div class="form-cluster">
+          <label class="form-label" for="project_preset_selector">Saved presets</label>
+          <select id="project_preset_selector" class="form-select" multiple size="{{ 5 if project_presets|length >= 5 else 3 }}">
+            {% for preset in project_presets %}
+            <option
+              value="{{ preset.id }}"
+              data-preset-label="{{ preset.label }}"
+              data-project-name="{{ preset.project_name }}"
+              data-project-summary="{{ preset.project_summary }}"
+              data-project-topics="{{ preset.project_topics|join(', ') }}"
+              data-project-prefix="{{ preset.project_prompt_prefix }}"
+              data-project-suffix="{{ preset.project_prompt_suffix }}"
+            >
+              {{ preset.label }}
+            </option>
+            {% endfor %}
+          </select>
+          <p class="helper-copy mb-0">Select one or more presets to auto-fill the context fields used during upload and prompt generation.</p>
+        </div>
+        <div class="record-actions mt-3" id="record_controls" aria-label="Recording controls">
           <button id="record_screen_btn" class="btn btn-secondary" type="button">Record screen</button>
           <button id="record_webcam_btn" class="btn btn-secondary" type="button">Record webcam</button>
           <button id="record_both_btn" class="btn btn-secondary" type="button">Record both</button>
         </div>
-        <p class="helper-copy mb-0">The UI keeps the job card in place while the backend works, so capture never feels like a dead end.</p>
+        <p id="recording_status_message" class="helper-copy" role="status" aria-live="polite">
+          Browser recording works best on <code>localhost</code> or HTTPS. Plain <code>0.0.0.0</code> may be blocked by the browser.
+        </p>
+        <div class="stack-form mt-4">
+          <div class="form-cluster">
+            <label class="form-label" for="project_name">Project name</label>
+            <input id="project_name" name="project_name" form="project_preset_form" type="text" class="form-control" placeholder="OpenStreetMap deep dives">
+          </div>
+          <div class="form-cluster">
+            <label class="form-label" for="project_summary">Project summary</label>
+            <textarea id="project_summary" name="project_summary" form="project_preset_form" class="form-control" rows="3" placeholder="Series context that should shape titles and descriptions."></textarea>
+          </div>
+          <div class="form-cluster">
+            <label class="form-label" for="project_topics">Project topics</label>
+            <input id="project_topics" name="project_topics" form="project_preset_form" type="text" class="form-control" placeholder="mapping, civic data, geospatial">
+          </div>
+          <div class="form-cluster">
+            <label class="form-label" for="project_prompt_prefix">Pre-hook</label>
+            <input id="project_prompt_prefix" name="project_prompt_prefix" form="project_preset_form" type="text" class="form-control" placeholder="Keep the framing practical and map-builder focused.">
+          </div>
+          <div class="form-cluster">
+            <label class="form-label" for="project_prompt_suffix">Post-hook</label>
+            <input id="project_prompt_suffix" name="project_prompt_suffix" form="project_preset_form" type="text" class="form-control" placeholder="Close with a clear takeaway for contributors.">
+          </div>
+        </div>
+        <form id="project_preset_form" method="post" action="/project-presets/save" class="stack-form mt-4" data-busy-form="true">
+          <input type="hidden" id="preset_id" name="preset_id">
+          <div class="form-cluster">
+            <label class="form-label" for="preset_label">Preset label</label>
+            <input id="preset_label" name="preset_label" type="text" class="form-control" placeholder="OSM contributor interviews" required>
+          </div>
+          <div class="action-row">
+            <button type="submit" class="btn btn-outline-primary btn-sm" data-busy-label="Saving preset...">Save current context as preset</button>
+            <button type="button" id="clear_preset_editor" class="btn btn-outline-secondary btn-sm">Clear preset editor</button>
+          </div>
+        </form>
+        {% if project_presets %}
+        <div class="metadata-list mt-4" id="project_preset_cards">
+          {% for preset in project_presets %}
+          <div>
+            <span>{{ preset.label }}</span>
+            <strong>{{ preset.project_topics|join(', ') or preset.project_summary or preset.project_name }}</strong>
+            <div class="action-row mt-2">
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                data-edit-preset="true"
+                data-preset-id="{{ preset.id }}"
+                data-preset-label="{{ preset.label }}"
+                data-project-name="{{ preset.project_name }}"
+                data-project-summary="{{ preset.project_summary }}"
+                data-project-topics="{{ preset.project_topics|join(', ') }}"
+                data-project-prefix="{{ preset.project_prompt_prefix }}"
+                data-project-suffix="{{ preset.project_prompt_suffix }}"
+              >
+                Edit
+              </button>
+              <form method="post" action="/project-presets/{{ preset.id }}/delete" class="inline-form" data-busy-form="true">
+                <button type="submit" class="btn btn-outline-secondary btn-sm" data-busy-label="Removing...">Delete</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
     </div>
     <div class="queue-banner" id="upload_queue_summary" role="status" aria-live="polite">
@@ -117,13 +210,7 @@
       </div>
       <p class="section-copy">Every item stays in the same workflow: review it, choose a title, schedule it, and publish it without switching mental models.</p>
     </div>
-    {% if not records %}
-    <div id="dashboard_empty_state" class="empty-state">
-      <h3>No episodes yet</h3>
-      <p>Start with an upload or a browser recording and the library will fill itself in here.</p>
-    </div>
-    {% else %}
-    <div id="dashboard_empty_state" class="empty-state" hidden>
+    <div id="dashboard_empty_state" class="empty-state" {% if records %}hidden{% endif %}>
       <h3>No episodes yet</h3>
       <p>Start with an upload or a browser recording and the library will fill itself in here.</p>
     </div>
@@ -132,6 +219,5 @@
         {% include "partials/episode_card.html" %}
       {% endfor %}
     </div>
-    {% endif %}
   </section>
 {% endblock %}

@@ -54,6 +54,7 @@ class PromptExecution:
             "status": self.prompt_run["status"],
             "validation_passed": self.prompt_run["validation_passed"],
             "used_fallback": self.prompt_run["used_fallback"],
+            "fallback_reason": self.prompt_run.get("fallback_reason"),
             "issues": copy.deepcopy(self.prompt_run.get("validation_issues", [])),
             "completed_at": self.prompt_run["completed_at"],
         }

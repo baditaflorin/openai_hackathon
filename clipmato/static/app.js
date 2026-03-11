@@ -17,6 +17,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const liveRegion = document.getElementById("app-live-region");
   const recordsContainer = document.getElementById("records_container");
   const emptyState = document.getElementById("dashboard_empty_state");
+  const presetSelector = document.getElementById("project_preset_selector");
+  const captureErrorBanner = document.getElementById("capture_error_banner");
+  const captureErrorMessage = document.getElementById("capture_error_message");
+  const themeStorageKey = "clipmato-theme-preference";
 
   function announce(message) {
     if (!liveRegion || !message) {
@@ -26,6 +30,55 @@ document.addEventListener("DOMContentLoaded", () => {
     window.setTimeout(() => {
       liveRegion.textContent = message;
     }, 30);
+  }
+
+  function resolveThemePreference() {
+    const saved = window.localStorage.getItem(themeStorageKey);
+    if (saved === "light" || saved === "dark" || saved === "system") {
+      return saved;
+    }
+    return "system";
+  }
+
+  function applyThemePreference(preference) {
+    const html = document.documentElement;
+    const nextPreference = preference === "light" || preference === "dark" ? preference : "system";
+    html.dataset.theme = nextPreference;
+    window.localStorage.setItem(themeStorageKey, nextPreference);
+    const select = document.querySelector("[data-theme-preference]");
+    if (select) {
+      select.value = nextPreference;
+    }
+  }
+
+  function initThemeControls() {
+    const toggle = document.getElementById("theme_toggle");
+    const select = document.querySelector("[data-theme-preference]");
+    applyThemePreference(resolveThemePreference());
+
+    toggle?.addEventListener("click", () => {
+      const current = resolveThemePreference();
+      const next = current === "dark" ? "light" : "dark";
+      applyThemePreference(next);
+    });
+
+    select?.addEventListener("change", () => {
+      applyThemePreference(select.value);
+    });
+  }
+
+  function setCaptureError(message) {
+    if (!captureErrorBanner || !captureErrorMessage) {
+      return;
+    }
+    if (message) {
+      captureErrorMessage.textContent = message;
+      captureErrorBanner.hidden = false;
+      captureErrorBanner.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      return;
+    }
+    captureErrorMessage.textContent = "";
+    captureErrorBanner.hidden = true;
   }
 
   function escapeHtml(value) {
@@ -99,6 +152,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div>
           <p class="episode-card__eyebrow">Episode</p>
           <h3 class="episode-card__title" data-card-title>${escapeHtml(fileName)}</h3>
+          <p class="episode-card__meta mb-0" data-card-title-helper hidden></p>
         </div>
       </div>
       <p class="episode-card__meta" data-card-time>${escapeHtml(new Date().toLocaleString())}</p>
@@ -127,11 +181,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const progressBar = card.querySelector("[data-card-progress]");
     const detail = card.querySelector("[data-card-detail]");
     const title = card.querySelector("[data-card-title]");
+    const titleHelper = card.querySelector("[data-card-title-helper]");
     const time = card.querySelector("[data-card-time]");
     const actions = card.querySelector("[data-card-actions]");
 
     if (title && state.displayTitle) {
       title.textContent = state.displayTitle;
+    }
+    if (titleHelper) {
+      if (state.displayTitleHelper) {
+        titleHelper.hidden = false;
+        titleHelper.textContent = state.displayTitleHelper;
+      } else {
+        titleHelper.hidden = true;
+        titleHelper.textContent = "";
+      }
     }
     if (time && state.uploadTime) {
       time.textContent = state.uploadTime;
@@ -233,6 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
           updateCard(card, {
             recordId,
             displayTitle: summary.display_title || summary.filename,
+            displayTitleHelper: summary.display_title_helper || "",
             uploadTime: summary.upload_time,
             badgeText: summary.error ? "Processing failed" : "Ready",
             badgeKind: summary.error ? "danger" : "success",
@@ -316,16 +381,143 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function uniqueValues(values) {
+    const seen = new Set();
+    return values.filter((value) => {
+      const normalized = String(value || "").trim();
+      if (!normalized) {
+        return false;
+      }
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function selectedPresetOptions() {
+    if (!presetSelector) {
+      return [];
+    }
+    return Array.from(presetSelector.selectedOptions || []);
+  }
+
+  function applySelectedPresets() {
+    const options = selectedPresetOptions();
+    const projectName = document.getElementById("project_name");
+    const projectSummary = document.getElementById("project_summary");
+    const projectTopics = document.getElementById("project_topics");
+    const projectPromptPrefix = document.getElementById("project_prompt_prefix");
+    const projectPromptSuffix = document.getElementById("project_prompt_suffix");
+
+    if (!options.length) {
+      return;
+    }
+
+    const names = uniqueValues(options.map((option) => option.dataset.projectName));
+    const summaries = uniqueValues(options.map((option) => option.dataset.projectSummary));
+    const prefixes = uniqueValues(options.map((option) => option.dataset.projectPrefix));
+    const suffixes = uniqueValues(options.map((option) => option.dataset.projectSuffix));
+    const topics = uniqueValues(
+      options.flatMap((option) => String(option.dataset.projectTopics || "").split(",")),
+    );
+
+    if (projectName) {
+      projectName.value = names.join(" + ");
+    }
+    if (projectSummary) {
+      projectSummary.value = summaries.join(" ");
+    }
+    if (projectTopics) {
+      projectTopics.value = topics.join(", ");
+    }
+    if (projectPromptPrefix) {
+      projectPromptPrefix.value = prefixes.join(" ");
+    }
+    if (projectPromptSuffix) {
+      projectPromptSuffix.value = suffixes.join(" ");
+    }
+  }
+
+  function populatePresetEditor(button) {
+    const mappings = {
+      preset_id: "presetId",
+      preset_label: "presetLabel",
+      project_name: "projectName",
+      project_summary: "projectSummary",
+      project_topics: "projectTopics",
+      project_prompt_prefix: "projectPrefix",
+      project_prompt_suffix: "projectSuffix",
+    };
+    Object.entries(mappings).forEach(([elementId, datasetKey]) => {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.value = button.dataset[datasetKey] || "";
+      }
+    });
+  }
+
+  function clearPresetEditor() {
+    [
+      "preset_id",
+      "preset_label",
+      "project_name",
+      "project_summary",
+      "project_topics",
+      "project_prompt_prefix",
+      "project_prompt_suffix",
+    ].forEach((elementId) => {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.value = "";
+      }
+    });
+    if (presetSelector) {
+      Array.from(presetSelector.options).forEach((option) => {
+        option.selected = false;
+      });
+    }
+  }
+
+  function initProjectPresets() {
+    if (presetSelector) {
+      presetSelector.addEventListener("change", applySelectedPresets);
+    }
+    const clearButton = document.getElementById("clear_preset_editor");
+    if (clearButton) {
+      clearButton.addEventListener("click", clearPresetEditor);
+    }
+    document.querySelectorAll("[data-edit-preset='true']").forEach((button) => {
+      button.addEventListener("click", () => populatePresetEditor(button));
+    });
+  }
+
   function handleUpload(file) {
     const removeSilence = document.getElementById("remove_silence_checkbox")?.checked;
+    const projectName = document.getElementById("project_name")?.value || "";
+    const projectSummary = document.getElementById("project_summary")?.value || "";
+    const projectTopics = document.getElementById("project_topics")?.value || "";
+    const projectPromptPrefix = document.getElementById("project_prompt_prefix")?.value || "";
+    const projectPromptSuffix = document.getElementById("project_prompt_suffix")?.value || "";
     const card = createJobCard(`pending-${Date.now()}`, file.name);
     if (!card) {
       return;
     }
+    setCaptureError("");
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("remove_silence", Boolean(removeSilence));
+    selectedPresetOptions().forEach((option) => {
+      formData.append("selected_project_presets", option.value);
+    });
+    formData.append("project_name", projectName);
+    formData.append("project_summary", projectSummary);
+    formData.append("project_topics", projectTopics);
+    formData.append("project_prompt_prefix", projectPromptPrefix);
+    formData.append("project_prompt_suffix", projectPromptSuffix);
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/upload");
@@ -393,15 +585,17 @@ document.addEventListener("DOMContentLoaded", () => {
           isError: true,
         });
         announce(`Upload failed for ${file.name}.`);
+        setCaptureError(detail);
       }
     };
     xhr.onerror = () => {
+      const detail = "The browser could not reach the server.";
       updateCard(card, {
         recordId: card.dataset.recordId,
         displayTitle: file.name,
         badgeText: "Upload error",
         badgeKind: "danger",
-        detail: "The browser could not reach the server.",
+        detail,
         progress: 0,
         stage: "error",
         hideProgress: true,
@@ -411,6 +605,7 @@ document.addEventListener("DOMContentLoaded", () => {
           isError: true,
         });
       announce(`Upload error for ${file.name}.`);
+      setCaptureError(detail);
     };
     xhr.send(formData);
   }
@@ -424,8 +619,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const openFilePicker = () => fileInput.click();
-    fileSelectBtn.addEventListener("click", openFilePicker);
-    dropZone.addEventListener("click", openFilePicker);
+    fileSelectBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openFilePicker();
+    });
+    dropZone.addEventListener("click", (event) => {
+      if (event.target === fileSelectBtn) {
+        return;
+      }
+      openFilePicker();
+    });
     dropZone.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
@@ -503,6 +707,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function initRecordingControls() {
     const recordControls = document.getElementById("record_controls");
+    const recordingStatus = document.getElementById("recording_status_message");
     const screenButton = document.getElementById("record_screen_btn");
     const webcamButton = document.getElementById("record_webcam_btn");
     const bothButton = document.getElementById("record_both_btn");
@@ -513,9 +718,57 @@ document.addEventListener("DOMContentLoaded", () => {
     let mediaRecorder = null;
     let mediaChunks = [];
     let stopButton = null;
+    let activeStreams = [];
+    const updateRecordingStatus = (message, isError = false) => {
+      if (recordingStatus) {
+        recordingStatus.textContent = message;
+        recordingStatus.classList.toggle("is-danger", isError);
+      }
+    };
+
+    function stopActiveStreams() {
+      activeStreams.forEach((stream) => {
+        stream.getTracks().forEach((track) => track.stop());
+      });
+      activeStreams = [];
+    }
+
+    function pickRecordingFormat(hasAudioOnlyTracks) {
+      const candidates = hasAudioOnlyTracks
+        ? [
+            { mimeType: "audio/webm;codecs=opus", filename: "recording.webm" },
+            { mimeType: "audio/webm", filename: "recording.webm" },
+            { mimeType: "audio/ogg;codecs=opus", filename: "recording.ogg" },
+          ]
+        : [
+            { mimeType: "video/webm;codecs=vp8,opus", filename: "recording.webm" },
+            { mimeType: "video/webm", filename: "recording.webm" },
+          ];
+      if (typeof MediaRecorder.isTypeSupported !== "function") {
+        return { mimeType: "", filename: "recording.webm" };
+      }
+      const supported = candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate.mimeType));
+      return supported || { mimeType: "", filename: "recording.webm" };
+    }
+
+    const hasMediaDevices = Boolean(navigator.mediaDevices?.getUserMedia);
+    const hasSecureRecordingContext = window.isSecureContext || window.location.hostname === "localhost";
+    if (!hasMediaDevices || !hasSecureRecordingContext) {
+      [screenButton, webcamButton, bothButton].forEach((button) => {
+        button.disabled = true;
+      });
+      updateRecordingStatus(
+        hasMediaDevices
+          ? "Browser recording is blocked on this origin. Use https:// or localhost instead of 0.0.0.0."
+          : "This browser does not expose the media recording APIs needed for in-browser capture.",
+        true,
+      );
+      return;
+    }
 
     async function startRecording(captureScreen, captureWebcam) {
       try {
+        updateRecordingStatus("Requesting browser capture permissions...");
         const streams = [];
         if (captureScreen) {
           const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: captureWebcam });
@@ -529,12 +782,21 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const combined = new MediaStream(streams.flatMap((stream) => stream.getTracks()));
+        const audioOnly = new MediaStream(combined.getAudioTracks());
+        const recordAudioOnly = audioOnly.getAudioTracks().length > 0;
+        const recordingStream = recordAudioOnly ? audioOnly : combined;
+        const recordingFormat = pickRecordingFormat(recordAudioOnly);
+        activeStreams = streams;
         mediaChunks = [];
-        mediaRecorder = new MediaRecorder(combined);
+        mediaRecorder = recordingFormat.mimeType
+          ? new MediaRecorder(recordingStream, { mimeType: recordingFormat.mimeType })
+          : new MediaRecorder(recordingStream);
         mediaRecorder.ondataavailable = (event) => mediaChunks.push(event.data);
         mediaRecorder.onstop = () => {
-          const blob = new Blob(mediaChunks, { type: mediaChunks[0]?.type || "video/webm" });
-          const file = new File([blob], "recording.webm", { type: blob.type });
+          const blobType = mediaChunks[0]?.type || recordingFormat.mimeType || (recordAudioOnly ? "audio/webm" : "video/webm");
+          const blob = new Blob(mediaChunks, { type: blobType });
+          const file = new File([blob], recordingFormat.filename, { type: blob.type });
+          stopActiveStreams();
           handleUpload(file);
           [screenButton, webcamButton, bothButton].forEach((button) => {
             button.disabled = false;
@@ -543,7 +805,19 @@ document.addEventListener("DOMContentLoaded", () => {
             stopButton.remove();
             stopButton = null;
           }
+          updateRecordingStatus("Recording finished. Uploading the captured file now.");
           announce("Recording stopped and queued for processing.");
+        };
+        mediaRecorder.onerror = (event) => {
+          stopActiveStreams();
+          [screenButton, webcamButton, bothButton].forEach((button) => {
+            button.disabled = false;
+          });
+          if (stopButton) {
+            stopButton.remove();
+            stopButton = null;
+          }
+          updateRecordingStatus(event.error?.message || "The browser could not encode the recording.", true);
         };
 
         stopButton = document.createElement("button");
@@ -557,8 +831,18 @@ document.addEventListener("DOMContentLoaded", () => {
           button.disabled = true;
         });
         mediaRecorder.start();
+        updateRecordingStatus(
+          recordAudioOnly
+            ? "Recording is live. Browser capture will upload audio only for transcription."
+            : "Recording is live. No audio track was detected, so the browser will upload WebM video.",
+        );
         announce("Recording started.");
       } catch (error) {
+        stopActiveStreams();
+        updateRecordingStatus(
+          error?.message || "The browser could not start recording. Check permissions and secure-origin requirements.",
+          true,
+        );
         announce(error.message || "The browser could not start recording.");
       }
     }
@@ -569,9 +853,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   initBusyForms();
+  initProjectPresets();
   initUploadWorkspace();
   initCadenceToggle();
   initSettingsVisibility();
+  initThemeControls();
   initRecordingControls();
   initExistingRecordPollers();
 });

@@ -12,12 +12,15 @@ from .utils.metadata import get_metadata_record, read_metadata, update_metadata,
 from .utils.progress import update_progress, read_progress, enrich_with_progress
 from .services.file_processing import process_file_async
 from .services.publishing import PublishingService
+from .services.project_presets import ProjectPresetService
 from .services.runtime_settings import RuntimeSettingsService
 from .services.scheduling import propose_schedule_async
+from .utils.static_assets import static_asset_path
 
 logger = logging.getLogger(__name__)
 publishing_service = PublishingService()
 runtime_settings_service = RuntimeSettingsService()
+project_preset_service = ProjectPresetService()
 
 
 class FileIOService:
@@ -91,6 +94,9 @@ class RuntimeSettingsFacade:
     def update_user_settings(self, updates: dict):
         return runtime_settings_service.update_user_settings(updates)
 
+    def apply_runtime_profile(self, profile: str):
+        return runtime_settings_service.apply_runtime_profile(profile)
+
     def update_secrets(self, updates: dict):
         return runtime_settings_service.update_secrets(updates)
 
@@ -104,8 +110,25 @@ class RuntimeSettingsFacade:
         return runtime_settings_service.secret_status(key)
 
 
+class ProjectPresetFacade:
+    """Service for persisted project presets used during capture."""
+
+    def read(self):
+        return project_preset_service.read_presets()
+
+    def save(self, payload: dict):
+        return project_preset_service.save_preset(payload)
+
+    def delete(self, preset_id: str):
+        return project_preset_service.delete_preset(preset_id)
+
+    def merge_context(self, preset_ids: list[str], manual_context: dict):
+        return project_preset_service.merge_context(preset_ids, manual_context)
+
+
 def get_templates() -> Jinja2Templates:
     """Dependency: Jinja2 templates instance."""
+    TEMPLATES.env.globals["static_asset"] = static_asset_path
     return TEMPLATES
 
 
@@ -142,3 +165,8 @@ def get_publishing_service() -> PublishingService:
 def get_runtime_settings_service() -> RuntimeSettingsFacade:
     """Dependency: runtime settings facade."""
     return RuntimeSettingsFacade()
+
+
+def get_project_preset_service() -> ProjectPresetFacade:
+    """Dependency: project preset facade."""
+    return ProjectPresetFacade()
