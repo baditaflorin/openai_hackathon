@@ -3,7 +3,7 @@ Utilities for schedule suggestion: dummy implementation and Agent-based.
 """
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from agents import Runner
 from ..agents.scheduler_agent import scheduler_agent
@@ -23,7 +23,7 @@ def generate_dummy_schedule(
     Returns a mapping of record IDs to ISO8601 datetime strings.
     """
     schedule: dict[str, str] = {}
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     if cadence in CADENCE_INTERVALS:
         interval = timedelta(**CADENCE_INTERVALS[cadence])
         start = now + interval

@@ -2,7 +2,7 @@
 
 This repository contains a minimal prototype of Clipmato—an automated production pipeline built with the OpenAI Agents SDK.
 
-Current release: `0.3.0`
+Current release: `0.4.0`
 
 ## Components
 - **Content Curator Agent** – Suggests topics and guests.
@@ -241,6 +241,7 @@ If a `.env` file exists in the working directory, Clipmato will load it automati
 - If your audio file exceeds OpenAI Whisper's 25MB upload limit, it will be automatically split into smaller segments and transcribed sequentially, then combined into a single transcript.
 - On the episode detail page, you'll see 5 suggested titles—choose one as your favorite and save it for later use.
 - Each record’s detail page now shows a **short description** and a **long description** generated from the transcript, along with any referenced **people** and **locations** automatically extracted.
+- The scheduler can now generate a dry-run preview or live-apply the backlog through a persisted `AgentRun` trace, and each run can be inspected later via `/agent-runs/<run_id>`.
 - You can record your screen, your webcam, or both directly in the web UI; once you finish recording, it’s automatically uploaded and processed.
 - A **Remove silence** checkbox in the upload controls allows you to automatically trim long silent sections from your recordings. The episode detail page will display both the original and trimmed durations when enabled.
 - You can also delete old records (and their audio files) directly from the home page using the "Delete" button next to each processed file.

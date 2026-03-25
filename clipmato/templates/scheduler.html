@@ -116,7 +116,7 @@
       <div class="section-heading">
         <div>
           <p class="section-kicker">Automation</p>
-          <h2 class="section-title">Auto-schedule the backlog</h2>
+          <h2 class="section-title">Preview or live-apply the backlog</h2>
         </div>
       </div>
       <form method="post" action="/scheduler/auto" class="stack-form" data-busy-form="true">
@@ -132,10 +132,63 @@
           <label for="n-days" class="form-label">Every N days</label>
           <input type="number" name="n_days" id="n-days" class="form-control" placeholder="3">
         </div>
-        <button type="submit" class="btn btn-primary" data-busy-label="Scheduling...">Auto-schedule all</button>
+        <div class="action-row">
+          <button type="submit" name="mode" value="dry-run" class="btn btn-outline-secondary" data-busy-label="Previewing...">Preview schedule</button>
+          <button type="submit" name="mode" value="apply" class="btn btn-primary" data-busy-label="Applying...">Live apply schedule</button>
+        </div>
+        <p class="helper-copy mb-0">Each run now persists an auditable state machine with tool calls, retries, and a dry-run preview before side effects.</p>
       </form>
     </section>
   </section>
+
+  {% if scheduler_run %}
+  <section class="workflow-surface">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Agent run</p>
+        <h2 class="section-title">Latest scheduling run</h2>
+      </div>
+      <p class="section-copy">The scheduler now records state transitions, tool calls, and final outcomes for replayable audits.</p>
+    </div>
+    <div class="metadata-list">
+      <div><span>Run ID</span><strong class="hero-panel__mono">{{ scheduler_run.run_id }}</strong></div>
+      <div><span>State</span><strong>{{ scheduler_run.state | replace('_', ' ') | title }}</strong></div>
+      <div><span>Mode</span><strong>{{ 'Dry run' if scheduler_run.dry_run else 'Live apply' }}</strong></div>
+      <div><span>Goal</span><strong>{{ scheduler_run.goal }}</strong></div>
+    </div>
+    {% if scheduler_run.final_outcome %}
+    <div class="metadata-list">
+      <div><span>Preview entries</span><strong>{{ scheduler_run.final_outcome.entry_count or 0 }}</strong></div>
+      <div><span>Applied</span><strong>{{ 'Yes' if scheduler_run.final_outcome.applied else 'No' }}</strong></div>
+      <div><span>Approval required</span><strong>{{ 'Yes' if scheduler_run.final_outcome.approval_required else 'No' }}</strong></div>
+    </div>
+    {% endif %}
+    {% if scheduler_run.final_outcome and scheduler_run.final_outcome.entries %}
+    <div class="metadata-list">
+      {% for entry in scheduler_run.final_outcome.entries %}
+      <div>
+        <span>{{ entry.record_id }}</span>
+        <strong>{{ entry.schedule_time }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if scheduler_run.tool_calls %}
+    <div class="metadata-list">
+      {% for tool_call in scheduler_run.tool_calls %}
+      <div>
+        <span>{{ tool_call.tool_name }}</span>
+        <strong>{{ tool_call.status | replace('_', ' ') | title }} · {{ tool_call.risk_level }}</strong>
+        {% if tool_call.error %}
+        <p class="helper-copy mb-0">{{ tool_call.error }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <p class="helper-copy mb-0"><a href="/agent-runs/{{ scheduler_run.run_id }}">Open raw agent run JSON</a></p>
+  </section>
+  {% endif %}
 
   <section class="workflow-surface">
     <div class="section-heading">

@@ -21,6 +21,7 @@ from ..runtime import (
     get_openai_content_model,
     resolve_content_backend,
 )
+from ..utils.project_context import PROJECT_PROMPT_DEFAULTS
 from ..utils.metadata import get_metadata_record
 from .contracts import parse_task_output, validate_task_output
 from .registry import resolve_prompt_version
@@ -83,7 +84,7 @@ def _render_prompt(template: str, variables: dict[str, Any]) -> str:
     rendered = template.format_map(
         {
             key: value if isinstance(value, str) else str(value)
-            for key, value in variables.items()
+            for key, value in {**PROJECT_PROMPT_DEFAULTS, **variables}.items()
         }
     )
     return rendered.strip()

@@ -6,6 +6,7 @@ import logging
 
 from fastapi.templating import Jinja2Templates
 
+from .agent_runs import AgentRunService, AgentRunStorage
 from .config import TEMPLATES, UPLOAD_DIR
 from .utils.file_io import save_upload_file
 from .utils.metadata import get_metadata_record, read_metadata, update_metadata, remove_metadata
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 publishing_service = PublishingService()
 runtime_settings_service = RuntimeSettingsService()
 project_preset_service = ProjectPresetService()
+agent_run_storage = AgentRunStorage()
 
 
 class FileIOService:
@@ -170,3 +172,13 @@ def get_runtime_settings_service() -> RuntimeSettingsFacade:
 def get_project_preset_service() -> ProjectPresetFacade:
     """Dependency: project preset facade."""
     return ProjectPresetFacade()
+
+
+def get_agent_run_storage() -> AgentRunStorage:
+    """Dependency: shared persistent agent-run storage."""
+    return agent_run_storage
+
+
+def get_agent_run_service() -> AgentRunService:
+    """Dependency: agent-run reader/writer service."""
+    return AgentRunService(storage=agent_run_storage)

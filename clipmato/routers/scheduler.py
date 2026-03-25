@@ -1,14 +1,18 @@
 """
 Routes for scheduling episodes, both manual and automatic.
 """
+from urllib.parse import quote_plus
+
 from fastapi import APIRouter, Request, HTTPException, Form, Depends
 import calendar
 import logging
 from datetime import datetime
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from ..agent_runs import AgentRunService, SchedulerAgentRunWorkflow
 from ..config import YOUTUBE_DEFAULT_PRIVACY_STATUS
 from ..dependencies import (
+    get_agent_run_storage,
     get_templates,
     get_metadata_service,
     get_publishing_service,
@@ -30,6 +34,13 @@ def _youtube_callback_url(request: Request) -> str:
     return str(request.url_for("youtube_oauth_callback"))
 
 
+def _scheduler_redirect(kind: str, message: str, run_id: str | None = None) -> RedirectResponse:
+    target = f"/scheduler?{kind}={quote_plus(message)}"
+    if run_id:
+        target = f"{target}&run_id={quote_plus(run_id)}"
+    return RedirectResponse(url=target, status_code=303)
+
+
 @router.get("/scheduler", response_class=HTMLResponse)
 async def scheduler_page(
     request: Request,
@@ -37,6 +48,7 @@ async def scheduler_page(
     metadata_svc=Depends(get_metadata_service),
     progress_svc=Depends(get_progress_service),
     publishing_svc=Depends(get_publishing_service),
+    agent_run_storage=Depends(get_agent_run_storage),
 ):
     """Show the scheduling page for manual or automatic scheduling."""
     records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
@@ -60,6 +72,12 @@ async def scheduler_page(
                     "time": dt.strftime("%I:%M %p"),
                     "title": rec.get("selected_title") or rec.get("filename", ""),
                 })
+    run_reader = AgentRunService(storage=agent_run_storage)
+    requested_run_id = request.query_params.get("run_id")
+    scheduler_run = run_reader.get_run(requested_run_id) if requested_run_id else None
+    if scheduler_run is None:
+        latest_runs = run_reader.list_runs(workflow="scheduler_auto", limit=1)
+        scheduler_run = latest_runs[0] if latest_runs else None
     return templates.TemplateResponse(
         request,
         "scheduler.html",
@@ -74,6 +92,7 @@ async def scheduler_page(
             "youtube_status": youtube_status,
             "scheduler_notice": request.query_params.get("notice"),
             "scheduler_error": request.query_params.get("error"),
+            "scheduler_run": scheduler_run,
             "default_youtube_privacy_status": YOUTUBE_DEFAULT_PRIVACY_STATUS,
             "app_section": "schedule",
             "workflow_metrics": workflow_metrics(records),
@@ -88,29 +107,47 @@ async def scheduler_auto(
     metadata_svc=Depends(get_metadata_service),
     scheduling_svc=Depends(get_scheduling_service),
     publishing_svc=Depends(get_publishing_service),
+    agent_run_storage=Depends(get_agent_run_storage),
+    mode: str = Form("apply"),
 ):
-    """Automatically propose and save schedule times for unscheduled records."""
+    """Preview or apply schedule times through the persisted agent-run workflow."""
     logger.info(
-        "Auto-scheduling request: cadence=%s, n_days=%s",
+        "Auto-scheduling request: cadence=%s, n_days=%s, mode=%s",
         cadence,
         n_days,
+        mode,
     )
-    records = metadata_svc.read()
-    # schedule all unscheduled records (titles optional)
-    unscheduled = [rec for rec in records if not rec.get("schedule_time")]
-    if unscheduled:
-        suggestions = await scheduling_svc.propose(unscheduled, cadence=cadence, n_days=n_days)
-        for rid, stime in suggestions.items():
-            record = metadata_svc.get(rid)
-            if record is None:
-                continue
-            publishing_svc.schedule_record(
-                rid,
-                stime,
-                list(record.get("publish_targets") or []),
-                youtube_privacy_status=((record.get("publish_jobs") or {}).get("youtube") or {}).get("privacy_status"),
-            )
-    return RedirectResponse(url="/scheduler", status_code=303)
+    live_apply = mode != "dry-run"
+    workflow = SchedulerAgentRunWorkflow(
+        metadata_svc=metadata_svc,
+        scheduling_svc=scheduling_svc,
+        publishing_svc=publishing_svc,
+        storage=agent_run_storage,
+    )
+    run = await workflow.run(
+        cadence=cadence,
+        n_days=n_days,
+        live_apply=live_apply,
+        approval_granted=live_apply,
+    )
+    run_id = str(run["run_id"])
+    if run["state"] == "failed":
+        error = str((run.get("final_outcome") or {}).get("error") or "Scheduling agent run failed.")
+        return _scheduler_redirect("error", error, run_id)
+    if run["state"] == "awaiting_approval":
+        return _scheduler_redirect(
+            "notice",
+            "Scheduling preview is ready and waiting for approval before live apply.",
+            run_id,
+        )
+    if run.get("dry_run"):
+        return _scheduler_redirect("notice", "Scheduling preview generated without changing any records.", run_id)
+    applied_count = int((run.get("final_outcome") or {}).get("updated_record_ids") and len(run["final_outcome"]["updated_record_ids"]) or 0)
+    return _scheduler_redirect(
+        "notice",
+        f"Scheduling agent applied updates to {applied_count} record(s).",
+        run_id,
+    )
 
 
 @router.post("/record/{record_id}/schedule", response_class=RedirectResponse)

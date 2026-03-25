@@ -96,6 +96,9 @@ class FrontendPageTests(unittest.TestCase):
         self.assertIn("Browser recording works best on", client.get("/").text)
         self.assertIn("OpenStreetMap Deep Dives", client.get("/").text)
         self.assertIn("Topics: mapping, civic data", client.get("/record/rec-1").text)
+        scheduler_page = client.get("/scheduler").text
+        self.assertIn("Preview schedule", scheduler_page)
+        self.assertIn("Live apply schedule", scheduler_page)
 
     def test_dashboard_empty_state_still_renders_records_container(self) -> None:
         client = self.load_client()
@@ -206,7 +209,7 @@ class FrontendPageTests(unittest.TestCase):
         settings_payload = json.loads((Path(self.tempdir.name) / "settings.json").read_text())
         self.assertEqual(settings_payload["transcription_backend"], "local-whisper")
         self.assertEqual(settings_payload["content_backend"], "ollama")
-        self.assertEqual(settings_payload["ollama_model"], "gpt-oss:20b")
+        self.assertEqual(settings_payload["ollama_model"], "mistral-nemo:12b-instruct-2407-q3_K_S")
         self.assertEqual(settings_payload["ollama_timeout_seconds"], 120)
 
     def test_saved_public_base_url_is_used_for_oauth_callback(self) -> None:

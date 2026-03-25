@@ -1,6 +1,6 @@
 # ADR 0018: Agent run state machine and tooling contracts
 
-- Status: Proposed
+- Status: Accepted (Implemented in v0.4.0)
 - Date: 2026-03-24
 
 ## Context

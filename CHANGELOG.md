@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-25
+
+### Added
+
+- A first-class `AgentRun` runtime with explicit state transitions, persisted run traces, bounded tool retries, strict tool input/output contracts, and approval checkpoints for high-risk actions.
+- File-backed agent-run inspection via `/agent-runs/{run_id}` so scheduling previews and live applies remain auditable after the request completes.
+- A scheduler workflow that uses the new agent-run runtime to load unscheduled records, generate a schedule preview, and optionally live-apply the result through a high-risk tool contract.
+- ADR 0018 for the agent run state machine and tooling contracts, now accepted and implemented in `v0.4.0`.
+
+### Changed
+
+- The scheduler UI now offers both a dry-run preview and a live-apply path, and it surfaces the latest agent-run trace directly in the page.
+- Prompt rendering now always includes project-context default placeholders so project-aware prompt hooks remain safe even when optional values are omitted.
+- Runtime profile tests now align with the shipped local-offline default model of `mistral-nemo:12b-instruct-2407-q3_K_S`.
+
 ## [0.3.0] - 2026-03-09
 
 ### Added
