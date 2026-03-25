@@ -22,6 +22,7 @@ from ..dependencies import (
     get_progress_service,
     get_templates,
 )
+from ..services.eventing import emit_event
 from ..runtime import get_runtime_status
 from ..utils.presentation import present_record, workflow_metrics
 
@@ -100,6 +101,21 @@ async def upload(
         },
     )
     progress_svc.update(record_id, "transcribing", message)
+    try:
+        emit_event(
+            "record.uploaded",
+            aggregate_id=record_id,
+            record_id=record_id,
+            payload={
+                "filename": file.filename,
+                "remove_silence": remove_silence,
+                "selected_project_presets": selected_project_presets,
+            },
+            correlation_id=record_id,
+            source="upload",
+        )
+    except Exception:
+        pass
     background_tasks.add_task(
         processing_svc.process,
         file_path,

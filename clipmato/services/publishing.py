@@ -25,6 +25,7 @@ from ..providers import (
     PublishTemporaryError,
     YouTubePublisher,
 )
+from .eventing import emit_event
 from ..utils.metadata import get_metadata_record, mutate_metadata
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,22 @@ class PublishingService:
                     youtube_privacy_status=youtube_privacy_status,
                     now_iso=now,
                 )
+                try:
+                    emit_event(
+                        "publish.job.scheduled",
+                        aggregate_id=record_id,
+                        record_id=record_id,
+                        publish_job_id="youtube",
+                        payload={
+                            "schedule_time": schedule_time,
+                            "publish_targets": publish_targets,
+                            "youtube_privacy_status": youtube_privacy_status,
+                        },
+                        correlation_id=record_id,
+                        source="publishing",
+                    )
+                except Exception:
+                    logger.exception("[%s] Failed to append scheduled publish event", record_id)
                 return copy.deepcopy(rec)
             raise KeyError(record_id)
 
@@ -169,6 +186,21 @@ class PublishingService:
                     force_requeue=True,
                 )
                 publish_jobs[provider_key]["next_attempt_at"] = datetime.now().isoformat()
+                try:
+                    emit_event(
+                        "publish.job.requeued",
+                        aggregate_id=record_id,
+                        record_id=record_id,
+                        publish_job_id=provider_key,
+                        payload={
+                            "provider": provider_key,
+                            "next_attempt_at": publish_jobs[provider_key]["next_attempt_at"],
+                        },
+                        correlation_id=record_id,
+                        source="publishing",
+                    )
+                except Exception:
+                    logger.exception("[%s] Failed to append publish retry event", record_id)
                 return copy.deepcopy(rec)
             raise KeyError(record_id)
 
@@ -257,6 +289,18 @@ class PublishingService:
                 job["updated_at"] = now_iso
                 job["last_attempt_at"] = now_iso
                 job["attempt_count"] = int(job.get("attempt_count", 0)) + 1
+                try:
+                    emit_event(
+                        "publish.job.started",
+                        aggregate_id=rec.get("id"),
+                        record_id=rec.get("id"),
+                        publish_job_id="youtube",
+                        payload={"scheduled_for": due_at, "attempt_count": job["attempt_count"]},
+                        correlation_id=rec.get("id"),
+                        source="publishing",
+                    )
+                except Exception:
+                    logger.exception("[%s] Failed to append publish start event", rec.get("id"))
                 return {
                     "record": copy.deepcopy(rec),
                     "job": copy.deepcopy(job),
@@ -306,6 +350,22 @@ class PublishingService:
                 "provider_metadata": copy.deepcopy(provider_metadata),
             },
         )
+        try:
+            emit_event(
+                "publish.job.published",
+                aggregate_id=record_id,
+                record_id=record_id,
+                publish_job_id=provider_key,
+                payload={
+                    "remote_id": remote_id,
+                    "remote_url": remote_url,
+                    "provider_metadata": provider_metadata,
+                },
+                correlation_id=record_id,
+                source="publishing",
+            )
+        except Exception:
+            logger.exception("[%s] Failed to append publish success event", record_id)
 
     def _mark_failed(self, record_id: str, provider_key: str, exc: Exception, retryable: bool) -> None:
         now = datetime.now(UTC)
@@ -337,6 +397,18 @@ class PublishingService:
             metrics={"retryable": retryable},
             metadata={"error": str(exc)},
         )
+        try:
+            emit_event(
+                "publish.job.failed",
+                aggregate_id=record_id,
+                record_id=record_id,
+                publish_job_id=provider_key,
+                payload={"error": str(exc), "retryable": retryable},
+                correlation_id=record_id,
+                source="publishing",
+            )
+        except Exception:
+            logger.exception("[%s] Failed to append publish failure event", record_id)
 
     def _mark_blocked(self, record_id: str, provider_key: str, message: str, status: str) -> None:
         now = datetime.now(UTC).isoformat()
@@ -361,6 +433,18 @@ class PublishingService:
             status=status,
             metadata={"message": message},
         )
+        try:
+            emit_event(
+                "publish.job.blocked",
+                aggregate_id=record_id,
+                record_id=record_id,
+                publish_job_id=provider_key,
+                payload={"status": status, "message": message},
+                correlation_id=record_id,
+                source="publishing",
+            )
+        except Exception:
+            logger.exception("[%s] Failed to append publish blocked event", record_id)
 
     async def _worker_loop(self) -> None:
         logger.info("Clipmato publishing worker started")

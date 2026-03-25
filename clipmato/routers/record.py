@@ -13,6 +13,7 @@ from ..dependencies import (
     get_file_io_service,
     get_progress_service,
 )
+from ..services.eventing import emit_event
 from ..utils.presentation import present_record, workflow_metrics
 
 router = APIRouter()
@@ -87,6 +88,17 @@ async def select_title(
     updated_record = metadata_svc.update(record_id, {"selected_title": selected_title})
     if updated_record is not None:
         record_title_selection_evaluation(updated_record, selected_title)
+        try:
+            emit_event(
+                "record.title.selected",
+                aggregate_id=record_id,
+                record_id=record_id,
+                payload={"selected_title": selected_title},
+                correlation_id=record_id,
+                source="record",
+            )
+        except Exception:
+            pass
     return RedirectResponse(url=f"/record/{record_id}", status_code=303)
 
 
@@ -112,4 +124,15 @@ async def delete_record(
             dst.unlink()
         except Exception:
             pass
+    try:
+        emit_event(
+            "record.deleted",
+            aggregate_id=record_id,
+            record_id=record_id,
+            payload={"filename": rec.get("filename")},
+            correlation_id=record_id,
+            source="record",
+        )
+    except Exception:
+        pass
     return RedirectResponse(url="/", status_code=303)

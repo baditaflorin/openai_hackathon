@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import Any, Callable, Optional
 
+from .eventing import emit_event
 from ..utils.progress import update_progress
 
 logger = logging.getLogger(__name__)
@@ -42,13 +43,36 @@ async def run_stage(
             result = await asyncio.to_thread(func, *args)
         else:
             result = await func(*args)
+        result_summary = log_result(result) if log_result else None
         if log_result:
-            logger.info(f"[{rec_id}] Stage '{stage}' result: {log_result(result)}")
+            logger.info(f"[{rec_id}] Stage '{stage}' result: {result_summary}")
         else:
             logger.info(f"[{rec_id}] Completed stage '{stage}'")
+        try:
+            emit_event(
+                "workflow.stage.completed",
+                aggregate_id=rec_id,
+                record_id=rec_id,
+                payload={"stage": stage, "result_summary": result_summary},
+                correlation_id=rec_id,
+                source="workflow",
+            )
+        except Exception:
+            logger.exception(f"[{rec_id}] Failed to append completion event for stage '{stage}'")
         return result
     except Exception:
         logger.exception(f"[{rec_id}] Exception in stage '{stage}'")
+        try:
+            emit_event(
+                "workflow.stage.failed",
+                aggregate_id=rec_id,
+                record_id=rec_id,
+                payload={"stage": stage},
+                correlation_id=rec_id,
+                source="workflow",
+            )
+        except Exception:
+            logger.exception(f"[{rec_id}] Failed to append failure event for stage '{stage}'")
         raise
 
 def with_fallback(fallback_func):

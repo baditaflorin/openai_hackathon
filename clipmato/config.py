@@ -39,6 +39,8 @@ PROMPT_RELEASE_STATE_PATH = UPLOAD_DIR / "prompt_release_state.json"
 PROJECT_PRESETS_PATH = UPLOAD_DIR / "project_presets.json"
 AGENT_RUNS_DIR = UPLOAD_DIR / "agent_runs"
 AGENT_RUNS_DIR.mkdir(parents=True, exist_ok=True)
+EVENTS_PATH = UPLOAD_DIR / "events.jsonl"
+WEBHOOKS_PATH = UPLOAD_DIR / "webhooks.json"
 
 ALLOWED_UPLOAD_MIME_TYPES: set[str] = {
     "audio/flac",

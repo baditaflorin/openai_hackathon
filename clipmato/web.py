@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 
 from .config import STATIC_BUILD_DIR
-from .dependencies import get_publishing_service
+from .dependencies import get_eventing_service, get_publishing_service
 from .routers import list_routers
 from .utils.metadata import metadata_cache
 from .utils.static_assets import CachedStaticFiles, build_static_assets
@@ -22,12 +22,15 @@ async def lifespan(app: FastAPI):
     """Start and stop background services for the web app."""
     build_static_assets()
     metadata_cache.warm()
+    eventing_service = get_eventing_service()
     publishing_service = get_publishing_service()
+    await eventing_service.start_worker()
     await publishing_service.start_worker()
     try:
         yield
     finally:
         await publishing_service.stop_worker()
+        await eventing_service.stop_worker()
 
 
 app = FastAPI(lifespan=lifespan)

@@ -1,9 +1,13 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from .file_io import upload_dir
 from ..config import STAGE_PROGRESS
+from ..services.eventing import emit_event
+
+logger = logging.getLogger(__name__)
 
 
 def get_status_file(record_id: str) -> Path:
@@ -18,6 +22,17 @@ def update_progress(record_id: str, stage: str, message: str | None = None) -> N
     if message:
         status["message"] = message
     _atomic_write(get_status_file(record_id), status)
+    try:
+        emit_event(
+            "record.progress.updated",
+            aggregate_id=record_id,
+            record_id=record_id,
+            payload=status,
+            correlation_id=record_id,
+            source="progress",
+        )
+    except Exception:
+        logger.exception("Failed to append progress event for %s", record_id)
 
 
 def read_progress(record_id: str) -> dict:
@@ -74,7 +89,8 @@ def _validate_status(raw: Any) -> dict[str, Any]:
     if "error" in raw and isinstance(raw["error"], str):
         status["error"] = raw["error"]
     return status
-    
+
+
 def enrich_with_progress(records: list[dict]) -> list[dict]:
     """
     Merge each record dict with its current progress status (stage & percentage).

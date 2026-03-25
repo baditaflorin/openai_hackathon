@@ -13,6 +13,7 @@ from ..steps.script_generation import generate_script_with_prompt_async
 from ..steps.audio_editing import edit_audio_async
 from ..steps.distribution import distribute_with_prompt_async
 from ..utils.progress import update_progress
+from ..services.eventing import emit_event
 from ..utils.metadata import append_metadata
 from ..utils.project_context import normalize_project_context
 from ..steps.silence_removal import remove_silence as remove_silence_step
@@ -42,6 +43,21 @@ async def process_file_async(
         "filename": filename,
         "project_context": normalize_project_context(project_context),
     }
+    try:
+        emit_event(
+            "record.processing.started",
+            aggregate_id=rec_id,
+            record_id=rec_id,
+            payload={
+                "filename": filename,
+                "remove_silence": remove_silence,
+                "project_context": context["project_context"],
+            },
+            correlation_id=rec_id,
+            source="file_processing",
+        )
+    except Exception:
+        logger.exception(f"[{rec_id}] Failed to append processing start event")
 
     steps: list[Step] = [
         Step(
@@ -142,6 +158,22 @@ async def process_file_async(
 
         append_metadata(record)
         update_progress(rec_id, "complete")
+        try:
+            emit_event(
+                "record.processing.completed",
+                aggregate_id=rec_id,
+                record_id=rec_id,
+                payload={
+                    "filename": filename,
+                    "has_transcript": bool(context.get("transcript")),
+                    "title_count": len(context.get("titles") or []),
+                    "publish_targets": list(record.get("publish_targets") or []),
+                },
+                correlation_id=rec_id,
+                source="file_processing",
+            )
+        except Exception:
+            logger.exception(f"[{rec_id}] Failed to append processing completion event")
         return record
     except Exception as exc:
         logger.exception(f"[{rec_id}] Error during file processing")
@@ -159,4 +191,15 @@ async def process_file_async(
             "prompt_runs": {},
         }
         append_metadata(record)
+        try:
+            emit_event(
+                "record.processing.failed",
+                aggregate_id=rec_id,
+                record_id=rec_id,
+                payload={"filename": filename, "error": err_msg},
+                correlation_id=rec_id,
+                source="file_processing",
+            )
+        except Exception:
+            logger.exception(f"[{rec_id}] Failed to append processing failure event")
         return record

@@ -17,6 +17,7 @@ from .governance import (
 from .utils.file_io import save_upload_file
 from .utils.metadata import get_metadata_record, read_metadata, update_metadata, remove_metadata
 from .utils.progress import update_progress, read_progress, enrich_with_progress
+from .services.eventing import eventing_service
 from .services.file_processing import process_file_async
 from .services.publishing import PublishingService
 from .services.project_presets import ProjectPresetService
@@ -75,6 +76,44 @@ class ProcessingService:
 
     async def process(self, *args, **kwargs):
         return await process_file_async(*args, **kwargs)
+
+
+class EventingFacade:
+    """Service for append-only events, SSE, and webhook delivery."""
+
+    def emit(self, *args, **kwargs):
+        return eventing_service.emit_event(*args, **kwargs)
+
+    def list_events(self, *args, **kwargs):
+        return eventing_service.list_events(*args, **kwargs)
+
+    async def stream_events(self, *args, **kwargs):
+        async for event in eventing_service.stream_events(*args, **kwargs):
+            yield event
+
+    def register_webhook(self, *args, **kwargs):
+        return eventing_service.register_webhook(*args, **kwargs)
+
+    def list_webhooks(self):
+        return eventing_service.list_webhooks()
+
+    def get_webhook(self, webhook_id: str):
+        return eventing_service.get_webhook(webhook_id)
+
+    def delete_webhook(self, webhook_id: str):
+        return eventing_service.delete_webhook(webhook_id)
+
+    def replay_webhook(self, *args, **kwargs):
+        return eventing_service.replay_webhook(*args, **kwargs)
+
+    async def deliver_pending_webhooks_once(self):
+        return await eventing_service.deliver_pending_webhooks_once()
+
+    async def start_worker(self):
+        return await eventing_service.start_worker()
+
+    async def stop_worker(self):
+        return await eventing_service.stop_worker()
 
 
 class SchedulingService:
@@ -174,6 +213,11 @@ def get_progress_service() -> ProgressService:
 def get_processing_service() -> ProcessingService:
     """Dependency: Processing service instance."""
     return ProcessingService()
+
+
+def get_eventing_service() -> EventingFacade:
+    """Dependency: append-only event and webhook service instance."""
+    return EventingFacade()
 
 
 def get_scheduling_service() -> SchedulingService:
