@@ -181,7 +181,7 @@ async def apply_runtime_profile(
     if profile == "local-offline":
         return _settings_redirect(
             "notice",
-            "Local offline profile applied: local Whisper + Ollama gpt-oss:20b.",
+            "Local offline profile applied: local Whisper + Ollama mistral-nemo:12b-instruct-2407-q3_K_S.",
         )
     if profile == "apple-host-ollama":
         return _settings_redirect(
