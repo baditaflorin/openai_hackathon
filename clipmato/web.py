@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 
+from . import __version__
+from .api.errors import correlation_id_middleware, register_api_exception_handlers
 from .config import STATIC_BUILD_DIR
 from .dependencies import get_eventing_service, get_publishing_service
 from .routers import list_routers
@@ -33,7 +35,17 @@ async def lifespan(app: FastAPI):
         await eventing_service.stop_worker()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="Clipmato Public API",
+    version=__version__,
+    summary="Versioned public API contracts for uploads, progress, records, scheduling, and publishing.",
+    lifespan=lifespan,
+    openapi_url="/api/v1/openapi.json",
+    docs_url="/api/v1/docs",
+    redoc_url=None,
+)
+app.middleware("http")(correlation_id_middleware)
+register_api_exception_handlers(app)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.mount("/static", CachedStaticFiles(directory=STATIC_BUILD_DIR), name="static")
 

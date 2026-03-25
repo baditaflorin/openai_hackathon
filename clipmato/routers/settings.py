@@ -18,7 +18,7 @@ from ..dependencies import (
 from ..runtime import get_public_base_url, get_runtime_status
 from ..utils.presentation import present_record, workflow_metrics
 
-router = APIRouter()
+router = APIRouter(include_in_schema=False)
 
 RUNTIME_SETTING_FIELDS = (
     "transcription_backend",

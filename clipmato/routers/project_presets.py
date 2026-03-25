@@ -8,7 +8,7 @@ from fastapi.responses import RedirectResponse
 
 from ..dependencies import get_project_preset_service
 
-router = APIRouter()
+router = APIRouter(include_in_schema=False)
 
 
 def _redirect(kind: str, message: str) -> RedirectResponse:

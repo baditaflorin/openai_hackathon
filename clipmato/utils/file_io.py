@@ -50,13 +50,23 @@ def _candidate_content_types(upload_file: UploadFile) -> list[str]:
     return candidates
 
 
-def _validate_content_type(upload_file: UploadFile) -> None:
+def validate_upload_file(upload_file: UploadFile) -> None:
     """Ensure the uploaded file's MIME type or extension maps to a permitted type."""
     candidates = _candidate_content_types(upload_file)
+    explicit = (upload_file.content_type or "").strip().lower()
+
+    if explicit and explicit not in _GENERIC_CONTENT_TYPES:
+        if explicit in ALLOWED_UPLOAD_MIME_TYPES:
+            return
+        allowed = ", ".join(sorted(ALLOWED_UPLOAD_MIME_TYPES))
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported media type. Allowed types: {allowed}. Received: {explicit}",
+        )
+
     if any(candidate in ALLOWED_UPLOAD_MIME_TYPES for candidate in candidates):
         return
 
-    explicit = (upload_file.content_type or "").strip().lower()
     suffix = Path(upload_file.filename or "").suffix.lower()
     if explicit in _GENERIC_CONTENT_TYPES and suffix in {".mp4", ".mov", ".m4a", ".mp3", ".wav", ".ogg", ".opus", ".webm", ".mkv", ".flac"}:
         return
@@ -101,7 +111,7 @@ def save_upload_file(upload_file: UploadFile) -> str:
     after validating its MIME type and size, using a unique filename,
     and return its file path.
     """
-    _validate_content_type(upload_file)
+    validate_upload_file(upload_file)
     upload_file.file.seek(0)
     dest = upload_dir / generate_unique_filename(upload_file.filename)
     _copy_file_with_limit(upload_file, dest)

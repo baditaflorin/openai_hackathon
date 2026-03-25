@@ -24,7 +24,7 @@ from ..utils.presentation import present_record, workflow_metrics
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(include_in_schema=False)
 
 
 def _youtube_callback_url(request: Request) -> str:

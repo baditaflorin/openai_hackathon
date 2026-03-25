@@ -16,7 +16,7 @@ from ..dependencies import (
 from ..services.eventing import emit_event
 from ..utils.presentation import present_record, workflow_metrics
 
-router = APIRouter()
+router = APIRouter(include_in_schema=False)
 
 
 @router.get("/record/{record_id}", response_class=HTMLResponse)

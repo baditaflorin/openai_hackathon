@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - An event-driven API surface at `/api/v1/events` with replayable Server-Sent Events and webhook registration/replay endpoints.
 - Durable workflow event logging for uploads, progress transitions, record mutations, and publish lifecycle changes.
 - Signed webhook delivery with retries, dead-letter tracking, and replay from failed offsets.
+- A versioned public API under `/api/v1/*` covering uploads, progress, record retrieval, scheduling, publishing controls, runtime status, and project preset discovery.
+- Public API correlation IDs, standard machine-readable error envelopes, and idempotency-key support for upload, schedule, and publish mutations.
+- A committed OpenAPI artifact in `docs/openapi/clipmato-v1.openapi.json` plus a GitHub Actions workflow that regenerates and uploads the contract from CI.
+- ADR 0017 for API-first versioned public contracts, now accepted and implemented in `v0.4.0`.
 - ADR 0018 for the agent run state machine and tooling contracts, now accepted and implemented in `v0.4.0`.
 - ADR 0011, ADR 0012, ADR 0014, ADR 0016, and ADR 0021, now accepted and implemented in `v0.4.0`.
 - ADR 0019 for event-driven API delivery, now accepted and implemented in `v0.4.0`.
@@ -30,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Prompt rendering now always includes project-context default placeholders so project-aware prompt hooks remain safe even when optional values are omitted.
 - Prompt runs now persist policy outcomes and emit task-level governance evaluations alongside the existing prompt run ledger.
 - Long-running workflow visibility no longer depends only on polling; Clipmato now emits durable domain events alongside the existing polling endpoints.
+- FastAPI now publishes its public contract docs at `/api/v1/openapi.json` and `/api/v1/docs`, while legacy UI routes remain available without being exposed as public schema.
 
 ### Fixed
 

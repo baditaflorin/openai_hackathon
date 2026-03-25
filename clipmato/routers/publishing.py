@@ -10,7 +10,7 @@ from ..dependencies import get_metadata_service, get_publishing_service
 from ..providers import PublishError
 from ..runtime import get_public_base_url
 
-router = APIRouter()
+router = APIRouter(include_in_schema=False)
 
 
 def _scheduler_redirect(kind: str, message: str) -> RedirectResponse:
