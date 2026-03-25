@@ -1,6 +1,6 @@
 # ADR 0020: MCP gateway and tool capability layer
 
-- Status: Proposed
+- Status: Accepted (Implemented in v0.5.0)
 - Date: 2026-03-24
 
 ## Context

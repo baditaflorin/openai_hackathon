@@ -2,7 +2,7 @@
 
 This repository contains a minimal prototype of Clipmato—an automated production pipeline built with the OpenAI Agents SDK.
 
-Current release: `0.4.0`
+Current release: `0.5.0`
 
 ## Components
 - **Content Curator Agent** – Suggests topics and guests.
@@ -320,20 +320,20 @@ docker compose --profile local-ai up --build
 Build the web image with local Whisper installed:
 
 ```bash
-docker build --build-arg INSTALL_LOCAL_WHISPER=true -t clipmato:0.4.0 .
+docker build --build-arg INSTALL_LOCAL_WHISPER=true -t clipmato:0.5.0 .
 ```
 
 Run the built image directly from any working directory:
 
 ```bash
-docker build -t clipmato:0.4.0 .
+docker build -t clipmato:0.5.0 .
 docker run --rm -p 8000:8000 \
   -e OPENAI_API_KEY="$OPENAI_API_KEY" \
   -e GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
   -e GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
   -e CLIPMATO_BASE_URL="http://localhost:8000" \
   -v clipmato_data:/data \
-  clipmato:0.4.0
+  clipmato:0.5.0
 ```
 
 Notes:

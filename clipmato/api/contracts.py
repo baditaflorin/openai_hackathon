@@ -153,3 +153,62 @@ class PublishJobUpdateResponse(BaseModel):
     schedule_time: str | None = None
     publish_targets: list[str] = Field(default_factory=list)
     publish_jobs: dict[str, PublishJobModel] = Field(default_factory=dict)
+
+
+class MCPToolDefinitionModel(BaseModel):
+    name: str
+    description: str
+    scope: str
+    mutating: bool = False
+    approval_required: bool = False
+    supports_dry_run: bool = True
+    input_schema: dict[str, Any] = Field(default_factory=dict)
+    output_schema: dict[str, Any] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+
+
+class MCPResourceDefinitionModel(BaseModel):
+    name: str
+    description: str
+    scope: str
+    output_schema: dict[str, Any] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+
+
+class MCPCapabilityResponse(BaseModel):
+    supported_schema_version: str
+    negotiated_schema_version: str | None = None
+    compatible: bool
+    supported_feature_flags: dict[str, bool] = Field(default_factory=dict)
+    accepted_client_features: list[str] = Field(default_factory=list)
+    accepted_scopes: list[str] = Field(default_factory=list)
+    tools: list[MCPToolDefinitionModel] = Field(default_factory=list)
+    resources: list[MCPResourceDefinitionModel] = Field(default_factory=list)
+
+
+class MCPToolListResponse(BaseModel):
+    tools: list[MCPToolDefinitionModel] = Field(default_factory=list)
+
+
+class MCPResourceListResponse(BaseModel):
+    resources: list[MCPResourceDefinitionModel] = Field(default_factory=list)
+
+
+class MCPResourceReadResponse(BaseModel):
+    resource: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class MCPToolInvocationRequest(BaseModel):
+    input: dict[str, Any] = Field(default_factory=dict)
+    mode: str = "dry_run"
+    approved: bool = False
+    approval_token: str | None = None
+    scopes: list[str] = Field(default_factory=list)
+    actor: str = "api"
+
+
+class MCPToolInvocationResponse(BaseModel):
+    run_id: str
+    tool_result: dict[str, Any] = Field(default_factory=dict)
+    agent_run: dict[str, Any] = Field(default_factory=dict)

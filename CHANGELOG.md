@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-25
+
+### Added
+
+- An MCP gateway surface under `/api/v1/mcp/*` with capability negotiation, approved tool/resource discovery, dry-run versus live-apply execution, approval-gated sensitive tools, and rate-limited client access.
+- Runtime settings, runtime profile application, credential update, and publish actions exposed through explicit MCP-facing tool contracts rather than private in-process APIs.
+- Read-only MCP resources for runtime summary, record summaries, prompt run metadata, and publish status snapshots.
+- Focused MCP gateway service tests plus request-level API tests covering dry-run safety, idempotent live apply, and approval-gated publish execution.
+- ADR 0020 for the MCP gateway and tool capability layer, now accepted and implemented in `v0.5.0`.
+
+### Changed
+
+- The public OpenAPI contract now includes the MCP gateway routes and models.
+
 ## [0.4.0] - 2026-03-25
 
 ### Added
