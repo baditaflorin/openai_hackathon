@@ -206,7 +206,7 @@ class FrontendPageTests(unittest.TestCase):
         settings_payload = json.loads((Path(self.tempdir.name) / "settings.json").read_text())
         self.assertEqual(settings_payload["transcription_backend"], "local-whisper")
         self.assertEqual(settings_payload["content_backend"], "ollama")
-        self.assertEqual(settings_payload["ollama_model"], "gpt-oss:20b")
+        self.assertEqual(settings_payload["ollama_model"], "mistral-nemo:12b-instruct-2407-q3_K_S")
         self.assertEqual(settings_payload["ollama_timeout_seconds"], 120)
 
     def test_saved_public_base_url_is_used_for_oauth_callback(self) -> None:

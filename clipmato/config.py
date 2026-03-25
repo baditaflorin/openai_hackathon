@@ -20,13 +20,13 @@ DEFAULT_DATA_DIR = (
 # Templates and static files
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates")) if Jinja2Templates is not None else None
 STATIC_DIR = BASE_DIR / "static"
-STATIC_BUILD_DIR = UPLOAD_DIR / ".static-build"
-STATIC_BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Uploads and metadata paths. Runtime data can live outside the package so
 # packaged installs and containers can persist uploads in a writable volume.
 UPLOAD_DIR = Path(os.getenv(DATA_DIR_ENV_VAR, str(DEFAULT_DATA_DIR))).expanduser()
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+STATIC_BUILD_DIR = UPLOAD_DIR / ".static-build"
+STATIC_BUILD_DIR.mkdir(parents=True, exist_ok=True)
 METADATA_PATH = UPLOAD_DIR / "metadata.json"
 PROVIDERS_DIR = UPLOAD_DIR / "providers"
 PROVIDERS_DIR.mkdir(parents=True, exist_ok=True)
@@ -35,6 +35,7 @@ SECRETS_PATH = UPLOAD_DIR / "secrets.json"
 PROMPT_RUNS_PATH = UPLOAD_DIR / "prompt_runs.jsonl"
 PROMPT_EVALUATIONS_PATH = UPLOAD_DIR / "prompt_evaluations.jsonl"
 PROJECT_PRESETS_PATH = UPLOAD_DIR / "project_presets.json"
+EVENT_LOG_PATH = UPLOAD_DIR / "events.jsonl"
 
 ALLOWED_UPLOAD_MIME_TYPES: set[str] = {
     "audio/flac",

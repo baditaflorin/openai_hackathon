@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-25
+
+### Added
+
+- A versioned `/api/v1` surface with stable JSON envelopes, machine-readable API errors, and per-request correlation IDs.
+- An MCP gateway layer under `/api/v1/mcp/*` with capability negotiation, approved tool/resource descriptors, dry-run versus live-apply execution, approval-gated sensitive tools, and in-memory `AgentRun` tracking.
+- Durable event replay at `/api/v1/events` plus Server-Sent Events streaming at `/api/v1/events/stream` backed by an append-only JSONL event log.
+- ADR 0017 for versioned public contracts and ADR 0020 for the MCP gateway are now accepted and implemented in `v0.4.0`.
+
+### Changed
+
+- Runtime settings can now be updated through the public API without relying on redirect-only form flows, and API-triggered updates emit audit/event records for downstream clients.
+- The release metadata, examples, and image tags now point at `0.4.0`.
+
 ## [0.3.0] - 2026-03-09
 
 ### Added

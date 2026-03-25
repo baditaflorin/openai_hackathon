@@ -4,7 +4,7 @@ services:
       context: .
       args:
         INSTALL_LOCAL_WHISPER: "${CLIPMATO_INSTALL_LOCAL_WHISPER:-true}"
-    image: clipmato:0.3.0
+    image: clipmato:0.4.0
     depends_on:
       ollama:
         condition: service_healthy
