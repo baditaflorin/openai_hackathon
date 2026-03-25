@@ -6,6 +6,7 @@ import copy
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from ..config import (
     PUBLISH_MAX_ATTEMPTS,
@@ -13,11 +14,14 @@ from ..config import (
     PUBLISH_RETRY_SECONDS,
     YOUTUBE_DEFAULT_PRIVACY_STATUS,
 )
+from ..governance.policy import PolicyDecision, evaluate_publish_action
+from ..governance.storage import append_agent_evaluation
 from ..prompts import record_publish_evaluations
 from ..providers import (
     PublishAuthorizationError,
     PublishConfigurationError,
     PublishError,
+    PublishPolicyError,
     PublishTemporaryError,
     YouTubePublisher,
 )
@@ -45,7 +49,22 @@ class PublishingService:
         schedule_time: str,
         publish_targets: list[str],
         youtube_privacy_status: str | None = None,
+        override_actor: str | None = None,
+        override_reason: str | None = None,
     ) -> dict[str, Any]:
+        record = get_metadata_record(record_id)
+        if record is None:
+            raise KeyError(record_id)
+        preview = copy.deepcopy(record)
+        preview["schedule_time"] = schedule_time
+        preview["publish_targets"] = list(publish_targets)
+        if "YouTube" in publish_targets:
+            self._enforce_publish_policy(
+                preview,
+                "youtube",
+                action="schedule",
+                override=self._policy_override(override_actor, override_reason),
+            )
         now = datetime.now(UTC).isoformat()
 
         def _mutate(records: list[dict]) -> dict[str, Any]:
@@ -70,7 +89,13 @@ class PublishingService:
 
         return mutate_metadata(_mutate)
 
-    def queue_publish_now(self, record_id: str) -> dict[str, Any]:
+    def queue_publish_now(
+        self,
+        record_id: str,
+        *,
+        override_actor: str | None = None,
+        override_reason: str | None = None,
+    ) -> dict[str, Any]:
         schedule_time = datetime.now().replace(second=0, microsecond=0).isoformat()
         record = get_metadata_record(record_id)
         if record is None:
@@ -78,17 +103,44 @@ class PublishingService:
         publish_targets = list(record.get("publish_targets") or [])
         if "YouTube" not in publish_targets:
             publish_targets.append("YouTube")
+        preview = copy.deepcopy(record)
+        preview["schedule_time"] = schedule_time
+        preview["publish_targets"] = publish_targets
+        self._enforce_publish_policy(
+            preview,
+            "youtube",
+            action="queue_now",
+            override=self._policy_override(override_actor, override_reason),
+        )
         youtube_job = (record.get("publish_jobs") or {}).get("youtube", {})
         return self.schedule_record(
             record_id=record_id,
             schedule_time=schedule_time,
             publish_targets=publish_targets,
             youtube_privacy_status=youtube_job.get("privacy_status"),
+            override_actor=override_actor,
+            override_reason=override_reason,
         )
 
-    def retry_record(self, record_id: str, provider_key: str) -> dict[str, Any]:
+    def retry_record(
+        self,
+        record_id: str,
+        provider_key: str,
+        *,
+        override_actor: str | None = None,
+        override_reason: str | None = None,
+    ) -> dict[str, Any]:
         if provider_key != self.youtube.key:
             raise ValueError(f"Unknown provider: {provider_key}")
+        record = get_metadata_record(record_id)
+        if record is None:
+            raise KeyError(record_id)
+        self._enforce_publish_policy(
+            record,
+            provider_key,
+            action="retry",
+            override=self._policy_override(override_actor, override_reason),
+        )
 
         now = datetime.now(UTC).isoformat()
 
@@ -244,6 +296,16 @@ class PublishingService:
 
         mutate_metadata(_mutate)
         record_publish_evaluations(record_id, provider_key, remote_url)
+        self._record_publish_job_evaluation(
+            record_id,
+            provider_key,
+            status="published",
+            metadata={
+                "remote_id": remote_id,
+                "remote_url": remote_url,
+                "provider_metadata": copy.deepcopy(provider_metadata),
+            },
+        )
 
     def _mark_failed(self, record_id: str, provider_key: str, exc: Exception, retryable: bool) -> None:
         now = datetime.now(UTC)
@@ -268,6 +330,13 @@ class PublishingService:
                 return
 
         mutate_metadata(_mutate)
+        self._record_publish_job_evaluation(
+            record_id,
+            provider_key,
+            status="failed",
+            metrics={"retryable": retryable},
+            metadata={"error": str(exc)},
+        )
 
     def _mark_blocked(self, record_id: str, provider_key: str, message: str, status: str) -> None:
         now = datetime.now(UTC).isoformat()
@@ -286,6 +355,12 @@ class PublishingService:
                 return
 
         mutate_metadata(_mutate)
+        self._record_publish_job_evaluation(
+            record_id,
+            provider_key,
+            status=status,
+            metadata={"message": message},
+        )
 
     async def _worker_loop(self) -> None:
         logger.info("Clipmato publishing worker started")
@@ -381,3 +456,94 @@ class PublishingService:
             "remote_url": existing.get("remote_url") if job_status == "published" and not force_requeue else None,
             "last_error": last_error,
         }
+
+    def _policy_override(self, actor: str | None, reason: str | None) -> dict[str, str] | None:
+        if not actor or not reason:
+            return None
+        actor_name = str(actor).strip()
+        reason_text = str(reason).strip()
+        if not actor_name or not reason_text:
+            return None
+        return {
+            "actor": actor_name,
+            "reason": reason_text,
+        }
+
+    def _enforce_publish_policy(
+        self,
+        record: dict[str, Any],
+        provider_key: str,
+        *,
+        action: str,
+        override: dict[str, str] | None = None,
+    ) -> None:
+        decision = evaluate_publish_action(record, provider_key, action, override=override)
+        self._record_publish_policy_evaluation(
+            record_id=str(record.get("id") or ""),
+            provider_key=provider_key,
+            action=action,
+            decision=decision,
+            record=record,
+        )
+        if not decision.passed:
+            raise PublishPolicyError(decision.summary_message())
+
+    def _record_publish_policy_evaluation(
+        self,
+        *,
+        record_id: str,
+        provider_key: str,
+        action: str,
+        decision: PolicyDecision,
+        record: dict[str, Any],
+    ) -> None:
+        append_agent_evaluation(
+            {
+                "evaluation_id": str(uuid4()),
+                "subject_type": "publish_action",
+                "subject_id": f"{record_id}:{provider_key}:{action}",
+                "record_id": record_id,
+                "action": action,
+                "status": decision.status,
+                "policy_status": decision.status,
+                "metrics": {
+                    "policy_passed": decision.passed,
+                    "override_used": decision.override_used,
+                },
+                "metadata": {
+                    "provider": provider_key,
+                    "selected_title": record.get("selected_title"),
+                    "schedule_time": record.get("schedule_time"),
+                    "issues": [issue.as_dict() for issue in decision.issues],
+                    "override_actor": decision.override_actor,
+                    "override_reason": decision.override_reason,
+                },
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        )
+
+    def _record_publish_job_evaluation(
+        self,
+        record_id: str,
+        provider_key: str,
+        *,
+        status: str,
+        metrics: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        append_agent_evaluation(
+            {
+                "evaluation_id": str(uuid4()),
+                "subject_type": "publish_job",
+                "subject_id": f"{record_id}:{provider_key}",
+                "record_id": record_id,
+                "action": "publish_result",
+                "status": status,
+                "metrics": copy.deepcopy(metrics or {}),
+                "metadata": {
+                    "provider": provider_key,
+                    **copy.deepcopy(metadata or {}),
+                },
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        )

@@ -13,13 +13,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - A first-class `AgentRun` runtime with explicit state transitions, persisted run traces, bounded tool retries, strict tool input/output contracts, and approval checkpoints for high-risk actions.
 - File-backed agent-run inspection via `/agent-runs/{run_id}` so scheduling previews and live applies remain auditable after the request completes.
 - A scheduler workflow that uses the new agent-run runtime to load unscheduled records, generate a schedule preview, and optionally live-apply the result through a high-risk tool contract.
+- A governance layer for prompt and publish workflows with structured policy decisions, durable agent evaluation records, and release-gate reporting.
+- Deterministic live apply and canary rollout support for prompt versions via `clipmato.governance.apply_prompt_release(...)`.
+- Publish policy enforcement before scheduling, queueing, retrying, and promoting live prompt versions, including audited human overrides.
+- Settings-page controls for prompt release evaluation, live apply, canary rollout, and rollback.
 - ADR 0018 for the agent run state machine and tooling contracts, now accepted and implemented in `v0.4.0`.
+- ADR 0011, ADR 0012, ADR 0014, ADR 0016, and ADR 0021, now accepted and implemented in `v0.4.0`.
 
 ### Changed
 
 - The scheduler UI now offers both a dry-run preview and a live-apply path, and it surfaces the latest agent-run trace directly in the page.
 - Prompt rendering now always includes project-context default placeholders so project-aware prompt hooks remain safe even when optional values are omitted.
-- Runtime profile tests now align with the shipped local-offline default model of `mistral-nemo:12b-instruct-2407-q3_K_S`.
+- Prompt runs now persist policy outcomes and emit task-level governance evaluations alongside the existing prompt run ledger.
+
+### Fixed
+
+- Configuration startup now initializes the runtime data directory before deriving the hashed static asset build directory.
 
 ## [0.3.0] - 2026-03-09
 

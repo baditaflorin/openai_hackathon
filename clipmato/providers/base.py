@@ -38,3 +38,9 @@ class PublishAuthorizationError(PublishError):
     """Failure caused by missing or revoked third-party authorization."""
 
     blocked = True
+
+
+class PublishPolicyError(PublishError):
+    """Failure caused by governance policy checks before side effects run."""
+
+    blocked = True

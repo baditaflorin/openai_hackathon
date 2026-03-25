@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from urllib.parse import quote_plus
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from ..dependencies import get_metadata_service, get_publishing_service
@@ -80,6 +80,8 @@ async def youtube_disconnect(
 @router.post("/record/{record_id}/publish/youtube/now")
 async def publish_youtube_now(
     record_id: str,
+    override_actor: str | None = Form(None),
+    override_reason: str | None = Form(None),
     metadata_svc=Depends(get_metadata_service),
     publishing_svc=Depends(get_publishing_service),
 ) -> RedirectResponse:
@@ -87,7 +89,11 @@ async def publish_youtube_now(
     if metadata_svc.get(record_id) is None:
         raise HTTPException(status_code=404, detail="Record not found")
     try:
-        publishing_svc.queue_publish_now(record_id)
+        publishing_svc.queue_publish_now(
+            record_id,
+            override_actor=override_actor,
+            override_reason=override_reason,
+        )
     except PublishError as exc:
         return _scheduler_redirect("error", str(exc))
     return _scheduler_redirect("notice", "YouTube publish queued.")
@@ -96,6 +102,8 @@ async def publish_youtube_now(
 @router.post("/record/{record_id}/publish/youtube/retry")
 async def retry_youtube_publish(
     record_id: str,
+    override_actor: str | None = Form(None),
+    override_reason: str | None = Form(None),
     metadata_svc=Depends(get_metadata_service),
     publishing_svc=Depends(get_publishing_service),
 ) -> RedirectResponse:
@@ -103,7 +111,12 @@ async def retry_youtube_publish(
     if metadata_svc.get(record_id) is None:
         raise HTTPException(status_code=404, detail="Record not found")
     try:
-        publishing_svc.retry_record(record_id, "youtube")
+        publishing_svc.retry_record(
+            record_id,
+            "youtube",
+            override_actor=override_actor,
+            override_reason=override_reason,
+        )
     except (KeyError, PublishError) as exc:
         return _scheduler_redirect("error", str(exc))
     return _scheduler_redirect("notice", "YouTube publish requeued.")

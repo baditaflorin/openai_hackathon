@@ -62,5 +62,5 @@ def test_apply_local_offline_profile_sets_whisper_and_ollama_defaults(tmp_path: 
 
     assert resolved["transcription_backend"] == "local-whisper"
     assert resolved["content_backend"] == "ollama"
-    assert resolved["ollama_model"] == "mistral-nemo:12b-instruct-2407-q3_K_S"
+    assert resolved["ollama_model"] == "gpt-oss:20b"
     assert resolved["ollama_timeout_seconds"] == 120

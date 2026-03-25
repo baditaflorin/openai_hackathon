@@ -9,6 +9,7 @@ from functools import lru_cache
 from importlib import resources
 from typing import Any
 
+from ..governance.release_rollout import resolve_release_version
 
 PROMPT_DEFINITIONS_PACKAGE = "clipmato.prompts.definitions"
 
@@ -109,13 +110,23 @@ def list_prompt_versions(task: str) -> list[PromptVersion]:
     return list(prompt_task.versions.values())
 
 
-def resolve_prompt_version(task: str, requested_version: str | None = None) -> PromptVersion:
+def resolve_prompt_version(
+    task: str,
+    requested_version: str | None = None,
+    *,
+    rollout_key: str | None = None,
+) -> PromptVersion:
     """Resolve the active prompt version for a task."""
     prompt_task = get_prompt_task(task)
     version_key = (
         requested_version
         or os.getenv(_task_env_name(task), "").strip()
-        or prompt_task.default_version
+        or resolve_release_version(
+            task,
+            prompt_task.default_version,
+            prompt_task.versions,
+            rollout_key=rollout_key,
+        )
     )
     try:
         return prompt_task.versions[version_key]

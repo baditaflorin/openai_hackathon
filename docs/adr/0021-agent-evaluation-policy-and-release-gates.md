@@ -1,6 +1,6 @@
 # ADR 0021: Agent evaluation, policy engine, and release gates
 
-- Status: Proposed
+- Status: Accepted (Implemented in v0.4.0)
 - Date: 2026-03-24
 
 ## Context

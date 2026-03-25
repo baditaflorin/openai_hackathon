@@ -4,6 +4,7 @@ from .base import (
     PublishAuthorizationError,
     PublishConfigurationError,
     PublishError,
+    PublishPolicyError,
     PublishResult,
     PublishTemporaryError,
 )
@@ -13,6 +14,7 @@ __all__ = [
     "PublishAuthorizationError",
     "PublishConfigurationError",
     "PublishError",
+    "PublishPolicyError",
     "PublishResult",
     "PublishTemporaryError",
     "YouTubePublisher",

@@ -320,20 +320,20 @@ docker compose --profile local-ai up --build
 Build the web image with local Whisper installed:
 
 ```bash
-docker build --build-arg INSTALL_LOCAL_WHISPER=true -t clipmato:0.3.0 .
+docker build --build-arg INSTALL_LOCAL_WHISPER=true -t clipmato:0.4.0 .
 ```
 
 Run the built image directly from any working directory:
 
 ```bash
-docker build -t clipmato:0.3.0 .
+docker build -t clipmato:0.4.0 .
 docker run --rm -p 8000:8000 \
   -e OPENAI_API_KEY="$OPENAI_API_KEY" \
   -e GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
   -e GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
   -e CLIPMATO_BASE_URL="http://localhost:8000" \
   -v clipmato_data:/data \
-  clipmato:0.3.0
+  clipmato:0.4.0
 ```
 
 Notes:
@@ -410,6 +410,7 @@ Important:
 - Version numbers follow Semantic Versioning starting at `0.1.0`.
 - Prompt definitions are versioned under `clipmato/prompts/definitions/*.json`.
 - You can pin a task to a specific prompt version with env vars such as `CLIPMATO_PROMPT_TITLE_SUGGESTION_VERSION=v1-format-tight`.
+- Live prompt releases can be evaluated and promoted with `clipmato.governance.evaluate_prompt_release(...)` and `clipmato.governance.apply_prompt_release(...)`, including deterministic canary rollout support.
 
 ### Scheduler
 

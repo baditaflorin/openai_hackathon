@@ -156,6 +156,8 @@ async def schedule_record(
     schedule_time: str = Form(...),
     publish_targets: list[str] = Form([]),
     youtube_privacy_status: str = Form(YOUTUBE_DEFAULT_PRIVACY_STATUS),
+    override_actor: str | None = Form(None),
+    override_reason: str | None = Form(None),
     metadata_svc=Depends(get_metadata_service),
     publishing_svc=Depends(get_publishing_service),
 ):
@@ -168,5 +170,7 @@ async def schedule_record(
         schedule_time,
         publish_targets,
         youtube_privacy_status=youtube_privacy_status,
+        override_actor=override_actor,
+        override_reason=override_reason,
     )
     return RedirectResponse(url="/scheduler", status_code=303)

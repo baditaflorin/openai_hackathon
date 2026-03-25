@@ -345,6 +345,87 @@
           <a href="/scheduler#publish-board" class="btn btn-outline-primary">Open publish board</a>
         </div>
       </section>
+
+      <section class="status-card">
+        <div class="section-heading section-heading--compact">
+          <div>
+            <p class="section-kicker">Prompt governance</p>
+            <h2 class="section-subtitle">Live apply and canary rollout</h2>
+          </div>
+          <span class="status-pill is-brand">quality-v1</span>
+        </div>
+        <p class="status-card__copy">Release gates use stored prompt-run evaluations. Apply a version live only after it passes the benchmark thresholds, or start with a deterministic canary.</p>
+
+        {% for release in prompt_release_summary %}
+        <article class="status-card">
+          <div class="section-heading section-heading--compact">
+            <div>
+              <h3 class="section-subtitle">{{ release.label }}</h3>
+              <p class="helper-copy">Task: <code>{{ release.task }}</code></p>
+            </div>
+            <span class="status-pill is-muted">live {{ release.live_version }}</span>
+          </div>
+          <p class="helper-copy">
+            Packaged default: <code>{{ release.packaged_default_version }}</code>.
+            {% if release.canary_version %}
+            Canary: <code>{{ release.canary_version }}</code> at {{ release.canary_percentage }}%.
+            {% else %}
+            No canary is active.
+            {% endif %}
+          </p>
+          {% if release.latest_change %}
+          <p class="helper-copy">Latest rollout: {{ release.latest_change.mode }} by {{ release.latest_change.applied_by }} on {{ release.latest_change.applied_at }}.</p>
+          {% endif %}
+
+          <form method="post" action="/settings/prompt-release/{{ release.task }}/apply" class="stack-form" data-busy-form="true">
+            <input type="hidden" name="suite_version" value="quality-v1">
+            <div class="settings-form-grid">
+              <div class="form-cluster">
+                <label class="form-label" for="prompt_version_{{ release.task }}">Prompt version</label>
+                <select class="form-select" id="prompt_version_{{ release.task }}" name="prompt_version">
+                  {% for version in release.versions %}
+                  <option value="{{ version.version }}" {% if version.version == release.live_version %}selected{% endif %}>
+                    {{ version.version }} · {{ version.status }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-cluster">
+                <label class="form-label" for="prompt_actor_{{ release.task }}">Actor</label>
+                <input class="form-control" id="prompt_actor_{{ release.task }}" name="actor" type="text" value="release-bot" autocomplete="off">
+              </div>
+              <div class="form-cluster">
+                <label class="form-label" for="prompt_notes_{{ release.task }}">Notes</label>
+                <input class="form-control" id="prompt_notes_{{ release.task }}" name="notes" type="text" placeholder="Why this rollout is safe to promote." autocomplete="off">
+              </div>
+              <div class="form-cluster">
+                <label class="form-label" for="prompt_canary_{{ release.task }}">Canary percent</label>
+                <input class="form-control" id="prompt_canary_{{ release.task }}" name="canary_percentage" type="number" min="1" max="99" value="{{ release.canary_percentage or 10 }}">
+              </div>
+            </div>
+            <div class="action-row">
+              <button type="submit" class="btn btn-primary" data-busy-label="Applying live release...">Live apply</button>
+              <button formaction="/settings/prompt-release/{{ release.task }}/canary" type="submit" class="btn btn-outline-secondary" data-busy-label="Starting canary...">Start canary</button>
+              <button formaction="/settings/prompt-release/{{ release.task }}/rollback" type="submit" class="btn btn-outline-primary" data-busy-label="Rolling back...">Rollback</button>
+            </div>
+          </form>
+
+          <div class="settings-guidance-grid">
+            {% for version in release.versions %}
+            <article class="status-card">
+              <h4 class="section-subtitle">{{ version.version }}</h4>
+              <p class="helper-copy">Runs: {{ version.quality.run_count }} · Contract pass: {{ version.quality.contract_pass_rate if version.quality.contract_pass_rate is not none else 'n/a' }} · Policy pass: {{ version.quality.policy_pass_rate if version.quality.policy_pass_rate is not none else 'n/a' }}</p>
+              {% if version.gate_passed %}
+              <p class="helper-copy">Release gate: passed</p>
+              {% else %}
+              <p class="helper-copy">Release gate: {{ version.gate_reasons | join(' ') }}</p>
+              {% endif %}
+            </article>
+            {% endfor %}
+          </div>
+        </article>
+        {% endfor %}
+      </section>
     </div>
   </section>
 
@@ -365,7 +446,7 @@
       <article class="status-card">
         <h3 class="section-subtitle">Build with local Whisper</h3>
         <p class="status-card__copy">Install the optional Whisper dependency directly into the web image for CPU or Linux GPU deployments.</p>
-        <pre class="settings-code"><code>docker build --build-arg INSTALL_LOCAL_WHISPER=true -t clipmato:0.3.0 .</code></pre>
+        <pre class="settings-code"><code>docker build --build-arg INSTALL_LOCAL_WHISPER=true -t clipmato:0.4.0 .</code></pre>
       </article>
       <article class="status-card">
         <h3 class="section-subtitle">Apple Silicon</h3>

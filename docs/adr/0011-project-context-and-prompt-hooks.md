@@ -1,6 +1,6 @@
 # ADR 0011: Project context and prompt hooks for reusable editorial guidance
 
-- Status: Accepted
+- Status: Accepted (Implemented in v0.3.0)
 - Date: 2026-03-10
 
 ## Context

@@ -8,6 +8,12 @@ from fastapi.templating import Jinja2Templates
 
 from .agent_runs import AgentRunService, AgentRunStorage
 from .config import TEMPLATES, UPLOAD_DIR
+from .governance import (
+    apply_prompt_release,
+    evaluate_prompt_release,
+    list_prompt_release_summaries,
+    rollback_prompt_release,
+)
 from .utils.file_io import save_upload_file
 from .utils.metadata import get_metadata_record, read_metadata, update_metadata, remove_metadata
 from .utils.progress import update_progress, read_progress, enrich_with_progress
@@ -128,6 +134,22 @@ class ProjectPresetFacade:
         return project_preset_service.merge_context(preset_ids, manual_context)
 
 
+class PromptGovernanceFacade:
+    """Service for prompt release summaries and rollout actions."""
+
+    def list_release_summaries(self, *, suite_version: str = "quality-v1"):
+        return list_prompt_release_summaries(suite_version=suite_version)
+
+    def evaluate_prompt_release(self, task: str, prompt_version: str, *, suite_version: str = "quality-v1"):
+        return evaluate_prompt_release(task, prompt_version, suite_version=suite_version)
+
+    def apply_prompt_release(self, task: str, prompt_version: str, actor: str, **kwargs):
+        return apply_prompt_release(task, prompt_version, actor, **kwargs)
+
+    def rollback_prompt_release(self, task: str, actor: str, *, notes: str | None = None):
+        return rollback_prompt_release(task, actor, notes=notes)
+
+
 def get_templates() -> Jinja2Templates:
     """Dependency: Jinja2 templates instance."""
     TEMPLATES.env.globals["static_asset"] = static_asset_path
@@ -182,3 +204,8 @@ def get_agent_run_storage() -> AgentRunStorage:
 def get_agent_run_service() -> AgentRunService:
     """Dependency: agent-run reader/writer service."""
     return AgentRunService(storage=agent_run_storage)
+
+
+def get_prompt_governance_service() -> PromptGovernanceFacade:
+    """Dependency: prompt governance facade."""
+    return PromptGovernanceFacade()

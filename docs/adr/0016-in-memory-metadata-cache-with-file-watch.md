@@ -1,6 +1,6 @@
 # ADR 0016: In-Memory Metadata Cache with File-Change Detection
 
-- Status: Proposed
+- Status: Accepted (Implemented in v0.3.0)
 - Date: 2026-03-10
 
 ## Context

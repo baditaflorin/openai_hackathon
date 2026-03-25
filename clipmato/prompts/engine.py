@@ -13,6 +13,8 @@ import httpx
 from agents import Agent, OpenAIChatCompletionsModel, RunConfig, Runner
 from openai import AsyncOpenAI
 
+from ..governance.policy import PolicyDecision, evaluate_prompt_output
+from ..governance.storage import append_agent_evaluation
 from ..runtime import (
     get_ollama_base_url,
     get_ollama_model,
@@ -23,6 +25,7 @@ from ..runtime import (
 )
 from ..utils.project_context import PROJECT_PROMPT_DEFAULTS
 from ..utils.metadata import get_metadata_record
+from ..utils.project_context import PROJECT_PROMPT_DEFAULTS
 from .contracts import parse_task_output, validate_task_output
 from .registry import resolve_prompt_version
 from .storage import (
@@ -57,6 +60,8 @@ class PromptExecution:
             "used_fallback": self.prompt_run["used_fallback"],
             "fallback_reason": self.prompt_run.get("fallback_reason"),
             "issues": copy.deepcopy(self.prompt_run.get("validation_issues", [])),
+            "policy_status": self.prompt_run.get("policy_status"),
+            "policy_issues": copy.deepcopy(self.prompt_run.get("policy_issues", [])),
             "completed_at": self.prompt_run["completed_at"],
         }
 
@@ -110,6 +115,8 @@ def _build_prompt_run(
     validation_issues: list[str],
     used_fallback: bool,
     fallback_reason: str | None,
+    policy_status: str,
+    policy_issues: list[dict[str, Any]],
     status: str,
 ) -> dict[str, Any]:
     return {
@@ -131,8 +138,42 @@ def _build_prompt_run(
         "validation_issues": validation_issues,
         "used_fallback": used_fallback,
         "fallback_reason": fallback_reason,
+        "policy_status": policy_status,
+        "policy_issues": policy_issues,
         "status": status,
     }
+
+
+def _policy_issues(decision: PolicyDecision) -> list[dict[str, Any]]:
+    return [issue.as_dict() for issue in decision.issues]
+
+
+def _record_prompt_run_evaluation(run: dict[str, Any]) -> None:
+    append_agent_evaluation(
+        {
+            "evaluation_id": str(uuid4()),
+            "subject_type": "prompt_run",
+            "subject_id": run["run_id"],
+            "record_id": run.get("record_id"),
+            "task": run.get("task"),
+            "prompt_version": run.get("prompt_version"),
+            "status": run.get("status"),
+            "policy_status": run.get("policy_status"),
+            "metrics": {
+                "contract_valid": bool(run.get("validation_passed")),
+                "fallback_used": bool(run.get("used_fallback")),
+                "latency_ms": run.get("duration_ms"),
+                "policy_passed": run.get("policy_status") == "passed",
+            },
+            "metadata": {
+                "backend": run.get("backend"),
+                "model": run.get("model"),
+                "policy_issues": _sanitize_payload(run.get("policy_issues") or []),
+                "validation_issues": _sanitize_payload(run.get("validation_issues") or []),
+            },
+            "created_at": run.get("completed_at"),
+        }
+    )
 
 
 def _local_execution(
@@ -147,6 +188,8 @@ def _local_execution(
     started_perf: float,
 ) -> PromptExecution:
     validation = validate_task_output(task, fallback_output, prompt_version.output_contract)
+    final_output = validation.normalized if validation.passed else fallback_output
+    policy_decision = evaluate_prompt_output(task, final_output)
     completed_at = datetime.now(UTC).isoformat()
     run = append_prompt_run(
         _build_prompt_run(
@@ -162,18 +205,21 @@ def _local_execution(
             duration_ms=round((perf_counter() - started_perf) * 1000),
             rendered_prompt=rendered_prompt,
             inputs=inputs,
-            output=validation.normalized,
+            output=final_output,
             raw_output=None,
             validation_passed=validation.passed,
             validation_issues=list(validation.issues),
             used_fallback=False,
             fallback_reason=None,
+            policy_status=policy_decision.status,
+            policy_issues=_policy_issues(policy_decision),
             status="completed" if validation.passed else "invalid_local_output",
         )
     )
+    _record_prompt_run_evaluation(run)
     if not validation.passed:
         logger.warning("Local prompt execution for %s produced invalid output: %s", task, validation.issues)
-    return PromptExecution(output=validation.normalized if validation.passed else fallback_output, prompt_run=run)
+    return PromptExecution(output=final_output, prompt_run=run)
 
 
 def _openai_run_config() -> RunConfig:
@@ -212,6 +258,7 @@ def _finalize_remote_execution(
     fallback_reason: str | None = None
     validation_issues: list[str] = []
     validation_passed = False
+    policy_decision = PolicyDecision(status="passed", risk_level="low")
 
     if error is None and raw_output is not None:
         try:
@@ -238,9 +285,17 @@ def _finalize_remote_execution(
         fallback_reason = error.__class__.__name__
         validation_issues.append(f"Prompt execution failed: {error}")
 
+    if not used_fallback:
+        policy_decision = evaluate_prompt_output(task, final_output)
+        if not policy_decision.passed:
+            used_fallback = True
+            fallback_reason = "policy_failed"
+            validation_issues.append("Fell back to local output because policy checks failed.")
+
     if used_fallback:
         fallback_validation = validate_task_output(task, fallback_output, prompt_version.output_contract)
         final_output = fallback_validation.normalized if fallback_validation.passed else fallback_output
+        policy_decision = evaluate_prompt_output(task, final_output)
 
     completed_at = datetime.now(UTC).isoformat()
     run = append_prompt_run(
@@ -263,9 +318,12 @@ def _finalize_remote_execution(
             validation_issues=validation_issues,
             used_fallback=used_fallback,
             fallback_reason=fallback_reason,
+            policy_status=policy_decision.status,
+            policy_issues=_policy_issues(policy_decision),
             status="fallback" if used_fallback else "completed",
         )
     )
+    _record_prompt_run_evaluation(run)
     return PromptExecution(output=final_output, prompt_run=run)
 
 
@@ -310,7 +368,7 @@ def run_prompt_task_sync(
     prompt_version: str | None = None,
 ) -> PromptExecution:
     """Run one prompt task synchronously through the selected backend."""
-    version = resolve_prompt_version(task, requested_version=prompt_version)
+    version = resolve_prompt_version(task, requested_version=prompt_version, rollout_key=record_id)
     rendered_prompt = _render_prompt(version.user_template, variables)
     started_at = datetime.now(UTC).isoformat()
     started_perf = perf_counter()
@@ -377,7 +435,7 @@ async def run_prompt_task_async(
     prompt_version: str | None = None,
 ) -> PromptExecution:
     """Run one prompt task asynchronously through the selected backend."""
-    version = resolve_prompt_version(task, requested_version=prompt_version)
+    version = resolve_prompt_version(task, requested_version=prompt_version, rollout_key=record_id)
     rendered_prompt = _render_prompt(version.user_template, variables)
     started_at = datetime.now(UTC).isoformat()
     started_perf = perf_counter()

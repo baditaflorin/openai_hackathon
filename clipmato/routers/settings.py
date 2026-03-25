@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from ..config import SECRETS_PATH, SETTINGS_PATH
 from ..dependencies import (
     get_metadata_service,
+    get_prompt_governance_service,
     get_progress_service,
     get_publishing_service,
     get_runtime_settings_service,
@@ -48,6 +49,7 @@ async def settings_page(
     request: Request,
     templates=Depends(get_templates),
     metadata_svc=Depends(get_metadata_service),
+    governance_svc=Depends(get_prompt_governance_service),
     progress_svc=Depends(get_progress_service),
     settings_svc=Depends(get_runtime_settings_service),
     publishing_svc=Depends(get_publishing_service),
@@ -67,6 +69,7 @@ async def settings_page(
             "settings_summary": settings_svc.summary(),
             "runtime_status": get_runtime_status(),
             "youtube_status": youtube_status,
+            "prompt_release_summary": governance_svc.list_release_summaries(),
             "settings_notice": request.query_params.get("notice"),
             "settings_error": request.query_params.get("error"),
             "settings_path": str(SETTINGS_PATH),
@@ -89,6 +92,82 @@ async def save_runtime_settings(
     return _settings_redirect("notice", "Runtime settings saved.")
 
 
+@router.post("/settings/prompt-release/{task}/apply")
+async def apply_prompt_release_live(
+    task: str,
+    request: Request,
+    governance_svc=Depends(get_prompt_governance_service),
+) -> RedirectResponse:
+    """Apply a prompt version to live traffic after it passes release gates."""
+    form = await request.form()
+    prompt_version = str(form.get("prompt_version") or "").strip()
+    actor = str(form.get("actor") or "").strip()
+    suite_version = str(form.get("suite_version") or "quality-v1").strip() or "quality-v1"
+    notes = str(form.get("notes") or "").strip() or None
+    try:
+        governance_svc.apply_prompt_release(
+            task,
+            prompt_version,
+            actor,
+            suite_version=suite_version,
+            canary_percentage=100,
+            notes=notes,
+        )
+    except (KeyError, ValueError) as exc:
+        return _settings_redirect("error", str(exc))
+    return _settings_redirect("notice", f"Live apply complete for {task}: {prompt_version}.")
+
+
+@router.post("/settings/prompt-release/{task}/canary")
+async def start_prompt_release_canary(
+    task: str,
+    request: Request,
+    governance_svc=Depends(get_prompt_governance_service),
+) -> RedirectResponse:
+    """Start a deterministic canary rollout for one prompt version."""
+    form = await request.form()
+    prompt_version = str(form.get("prompt_version") or "").strip()
+    actor = str(form.get("actor") or "").strip()
+    suite_version = str(form.get("suite_version") or "quality-v1").strip() or "quality-v1"
+    notes = str(form.get("notes") or "").strip() or None
+    canary_percentage = max(1, min(int(form.get("canary_percentage") or 10), 99))
+    try:
+        governance_svc.apply_prompt_release(
+            task,
+            prompt_version,
+            actor,
+            suite_version=suite_version,
+            canary_percentage=canary_percentage,
+            notes=notes,
+        )
+    except (KeyError, ValueError) as exc:
+        return _settings_redirect("error", str(exc))
+    return _settings_redirect(
+        "notice",
+        f"Canary started for {task}: {prompt_version} at {canary_percentage}% traffic.",
+    )
+
+
+@router.post("/settings/prompt-release/{task}/rollback")
+async def rollback_prompt_release_live(
+    task: str,
+    request: Request,
+    governance_svc=Depends(get_prompt_governance_service),
+) -> RedirectResponse:
+    """Rollback the live prompt version to the previous stable default."""
+    form = await request.form()
+    actor = str(form.get("actor") or "").strip()
+    notes = str(form.get("notes") or "").strip() or None
+    try:
+        result = governance_svc.rollback_prompt_release(task, actor, notes=notes)
+    except (KeyError, ValueError) as exc:
+        return _settings_redirect("error", str(exc))
+    return _settings_redirect(
+        "notice",
+        f"Rollback complete for {task}: {result['previous_live']} -> {result['rolled_back_to']}.",
+    )
+
+
 @router.post("/settings/runtime/profile/{profile}")
 async def apply_runtime_profile(
     profile: str,
@@ -102,7 +181,7 @@ async def apply_runtime_profile(
     if profile == "local-offline":
         return _settings_redirect(
             "notice",
-            "Local offline profile applied: local Whisper + Ollama mistral-nemo:12b-instruct-2407-q3_K_S.",
+            "Local offline profile applied: local Whisper + Ollama gpt-oss:20b.",
         )
     if profile == "apple-host-ollama":
         return _settings_redirect(

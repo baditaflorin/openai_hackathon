@@ -34,6 +34,8 @@ SETTINGS_PATH = UPLOAD_DIR / "settings.json"
 SECRETS_PATH = UPLOAD_DIR / "secrets.json"
 PROMPT_RUNS_PATH = UPLOAD_DIR / "prompt_runs.jsonl"
 PROMPT_EVALUATIONS_PATH = UPLOAD_DIR / "prompt_evaluations.jsonl"
+AGENT_EVALUATIONS_PATH = UPLOAD_DIR / "agent_evaluations.jsonl"
+PROMPT_RELEASE_STATE_PATH = UPLOAD_DIR / "prompt_release_state.json"
 PROJECT_PRESETS_PATH = UPLOAD_DIR / "project_presets.json"
 AGENT_RUNS_DIR = UPLOAD_DIR / "agent_runs"
 AGENT_RUNS_DIR.mkdir(parents=True, exist_ok=True)

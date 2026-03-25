@@ -22,6 +22,7 @@ class FrontendPageTests(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
         os.environ["CLIPMATO_DATA_DIR"] = self.tempdir.name
+        os.environ["CLIPMATO_CONTENT_BACKEND"] = "local"
         reset_clipmato_modules()
 
     def write_metadata(self, records: list[dict]) -> Path:
@@ -197,6 +198,40 @@ class FrontendPageTests(unittest.TestCase):
         self.assertEqual(secrets_payload["google_client_id"], "google-client-id")
         self.assertEqual(secrets_payload["google_client_secret"], "google-client-secret")
 
+    def test_settings_page_supports_live_prompt_apply(self) -> None:
+        prompts_module = importlib.import_module("clipmato.prompts")
+        release_state_path = Path(self.tempdir.name) / "prompt_release_state.json"
+
+        for index in range(2):
+            prompts_module.run_prompt_task_sync(
+                "title_suggestion",
+                {"transcript": f"Transcript {index}"},
+                fallback_output=["One", "Two", "Three", "Four", "Five"],
+                record_id=f"rec-live-ui-{index}",
+                prompt_version="v1-format-tight",
+            )
+
+        client = self.load_client()
+        settings_page = client.get("/settings")
+        self.assertEqual(settings_page.status_code, 200)
+        self.assertIn("Live apply", settings_page.text)
+
+        response = client.post(
+            "/settings/prompt-release/title_suggestion/apply",
+            data={
+                "prompt_version": "v1-format-tight",
+                "suite_version": "quality-v1",
+                "actor": "release-bot",
+                "notes": "Promote after benchmark pass.",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("notice=", response.headers["location"])
+        release_state = json.loads(release_state_path.read_text())
+        self.assertEqual(release_state["live_defaults"]["title_suggestion"], "v1-format-tight")
+
     def test_local_offline_profile_route_persists_local_runtime_defaults(self) -> None:
         client = self.load_client()
 
@@ -209,7 +244,7 @@ class FrontendPageTests(unittest.TestCase):
         settings_payload = json.loads((Path(self.tempdir.name) / "settings.json").read_text())
         self.assertEqual(settings_payload["transcription_backend"], "local-whisper")
         self.assertEqual(settings_payload["content_backend"], "ollama")
-        self.assertEqual(settings_payload["ollama_model"], "mistral-nemo:12b-instruct-2407-q3_K_S")
+        self.assertEqual(settings_payload["ollama_model"], "gpt-oss:20b")
         self.assertEqual(settings_payload["ollama_timeout_seconds"], 120)
 
     def test_saved_public_base_url_is_used_for_oauth_callback(self) -> None:
