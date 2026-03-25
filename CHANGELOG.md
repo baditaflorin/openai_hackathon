@@ -17,14 +17,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Deterministic live apply and canary rollout support for prompt versions via `clipmato.governance.apply_prompt_release(...)`.
 - Publish policy enforcement before scheduling, queueing, retrying, and promoting live prompt versions, including audited human overrides.
 - Settings-page controls for prompt release evaluation, live apply, canary rollout, and rollback.
+- An event-driven API surface at `/api/v1/events` with replayable Server-Sent Events and webhook registration/replay endpoints.
+- Durable workflow event logging for uploads, progress transitions, record mutations, and publish lifecycle changes.
+- Signed webhook delivery with retries, dead-letter tracking, and replay from failed offsets.
 - ADR 0018 for the agent run state machine and tooling contracts, now accepted and implemented in `v0.4.0`.
 - ADR 0011, ADR 0012, ADR 0014, ADR 0016, and ADR 0021, now accepted and implemented in `v0.4.0`.
+- ADR 0019 for event-driven API delivery, now accepted and implemented in `v0.4.0`.
 
 ### Changed
 
 - The scheduler UI now offers both a dry-run preview and a live-apply path, and it surfaces the latest agent-run trace directly in the page.
 - Prompt rendering now always includes project-context default placeholders so project-aware prompt hooks remain safe even when optional values are omitted.
 - Prompt runs now persist policy outcomes and emit task-level governance evaluations alongside the existing prompt run ledger.
+- Long-running workflow visibility no longer depends only on polling; Clipmato now emits durable domain events alongside the existing polling endpoints.
 
 ### Fixed
 

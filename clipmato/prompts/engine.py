@@ -25,7 +25,6 @@ from ..runtime import (
 )
 from ..utils.project_context import PROJECT_PROMPT_DEFAULTS
 from ..utils.metadata import get_metadata_record
-from ..utils.project_context import PROJECT_PROMPT_DEFAULTS
 from .contracts import parse_task_output, validate_task_output
 from .registry import resolve_prompt_version
 from .storage import (

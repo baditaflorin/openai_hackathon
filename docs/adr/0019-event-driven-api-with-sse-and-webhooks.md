@@ -1,6 +1,6 @@
 # ADR 0019: Event-driven API with SSE and webhooks
 
-- Status: Proposed
+- Status: Accepted (Implemented in v0.4.0)
 - Date: 2026-03-24
 
 ## Context
