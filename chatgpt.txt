@@ -1,0 +1,2536 @@
+File: README.md
+# Clipmato
+
+This repository contains a minimal prototype of Clipmato—an automated production pipeline built with the OpenAI Agents SDK.
+
+## Components
+- **Content Curator Agent** – Suggests topics and guests.
+- **Script Writer Agent** – Generates show notes and interview questions.
+- **Audio Editor Agent** – Placeholder for audio processing logic.
+- **Distributor Agent** – Publishes episodes.
+
+## Usage
+### Authentication
+
+Make sure you have your OpenAI API key set in your environment:
+
+```bash
+export OPENAI_API_KEY="your_openai_api_key_here"
+```
+
+### Prerequisites
+
+Ensure you have `ffmpeg` installed and available on your PATH so uploaded audio can be converted into a Whisper-supported format:
+
+```bash
+# macOS (Homebrew)
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+```
+
+Install dependencies and run the example pipeline:
+```bash
+pip install -r requirements.txt
+python -m clipmato.pipeline
+```
+> **Note:** We include `simpleaudio` in `requirements.txt` to satisfy pydub’s audio-operation needs.
+> Also ensure your Python build provides the standard `audioop` extension (or install a `pyaudioop` fallback) so that pydub silence removal will work without errors.
+
+### Modular API
+
+You can also import and run individual pipeline steps (including transcription and title suggestions):
+```python
+from clipmato.steps import (
+    transcribe_audio,
+    propose_titles,
+    curate_content,
+    generate_script,
+    edit_audio,
+    distribute,
+)
+
+# Transcribe a raw audio file to text
+
+# Transcribe a raw audio file to text
+transcript = transcribe_audio("path/to/raw_audio.mp3")
+
+# Get 5 title suggestions from the transcript
+titles = propose_titles(transcript)
+# titles is a list of strings
+
+# Curate content, generate script, edit audio, and distribute
+topic = curate_content("Find a trending tech topic")
+script = generate_script(topic)
+edited_audio = edit_audio("path/to/raw_audio.mp3")
+distribution = distribute(edited_audio)
+```
+
+Or run the full pipeline programmatically:
+```python
+from clipmato.pipeline import run_pipeline
+
+outputs = run_pipeline()
+```
+
+You can also access the scheduling utilities directly:
+
+```python
+from clipmato.services.scheduling import generate_dummy_schedule, propose_schedule_async
+from clipmato.utils.metadata import read_metadata
+
+records = read_metadata()
+# Synchronous dummy schedule (one episode per day)
+dummy_schedule = generate_dummy_schedule(records)
+
+import asyncio
+# Asynchronously propose schedule via the Scheduler Agent (fallback to dummy on error)
+schedules = asyncio.run(propose_schedule_async(records))
+```
+
+### Plugin Infrastructure
+
+Clipmato supports a plugin mechanism for both agents and pipeline steps.
+Simply drop a new Python module into the `clipmato/agents` or `clipmato/steps`
+directory, and Clipmato will automatically discover and load your plugin.
+
+#### Agents
+
+To define a new agent, create a file in `clipmato/agents` and define an
+`Agent` instance with a variable name ending in `_agent`. For example:
+
+```python
+# clipmato/agents/my_custom_agent.py
+from agents import Agent
+
+my_custom_agent = Agent(
+    name="My Custom Agent",
+    instructions="""
+    Your instructions here...
+    """
+)
+```
+
+Clipmato will register `my_custom_agent`, and you can retrieve it at runtime:
+
+```python
+from clipmato.agents import list_agents, get_agent
+
+agents = list_agents()
+agent = get_agent("My Custom Agent")
+```
+
+#### Steps
+
+To define a new pipeline step, create a file in `clipmato/steps` and define
+callable functions. For example:
+
+```python
+# clipmato/steps/my_step.py
+
+def my_step(input_data: str) -> str:
+    # perform processing...
+    return result
+```
+
+Your step function will be available through the `clipmato.steps` namespace:
+
+```python
+from clipmato.steps import my_step
+```
+
+#### Routers
+
+To define a new set of web endpoints, create a file in `clipmato/routers`
+and define an `APIRouter` instance named `router`. Clipmato will auto-discover
+your router and include it in the FastAPI app. For example:
+
+```python
+# clipmato/routers/my_feature.py
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/my_feature")
+
+@router.get("/")
+async def read_my_feature():
+    return {"message": "Hello from my feature"}
+```
+
+### GUI
+
+You can also launch a very small Tkinter interface (requires installed Tcl/Tk support):
+
+```bash
+python -m clipmato.gui
+```
+
+> **macOS**: If you get `ModuleNotFoundError: No module named '_tkinter'`, install Tcl/Tk and reinstall Python from python.org or via Homebrew:
+> ```bash
+> brew install tcl-tk
+> brew reinstall python --with-tcl-tk
+> ```
+>
+> **Ubuntu/Debian**:
+> ```bash
+> sudo apt-get install python3-tk
+> ```
+>
+> **Windows**: Make sure you installed Python from python.org, which includes Tcl/Tk by default.
+
+### Web Application
+
+You can also run a FastAPI-based web interface for drag-and-drop file upload and processing. The home page (Episode Dashboard) displays all your episodes as responsive cards—click any card to view its detailed transcript, short & long descriptions, and extracted entities.
+
+```bash
+pip install -r requirements.txt
+uvicorn clipmato.web:app --reload
+```
+
+Then visit `http://127.0.0.1:8000/` in your browser.
+
+- You can drag-and-drop or select a **video or audio file** in the web UI to upload.
+- An inline per-episode progress bar on each card displays upload and processing stages, allowing multiple concurrent uploads without blocking the UI.
+- If an error occurs during processing, the progress badge on the card will turn red and display the error message.
+- Episodes appear in the Episode Dashboard as a responsive grid of cards below the upload zone; click any card to view its details.
+- If your audio file exceeds OpenAI Whisper's 25MB upload limit, it will be automatically split into smaller segments and transcribed sequentially, then combined into a single transcript.
+- On the episode detail page, you'll see 5 suggested titles—choose one as your favorite and save it for later use.
+- Each record’s detail page now shows a **short description** and a **long description** generated from the transcript, along with any referenced **people** and **locations** automatically extracted.
+- You can record your screen, your webcam, or both directly in the web UI; once you finish recording, it’s automatically uploaded and processed.
+- A **Remove silence** checkbox in the upload controls allows you to automatically trim long silent sections from your recordings. The episode detail page will display both the original and trimmed durations when enabled.
+- You can also delete old records (and their audio files) directly from the home page using the "Delete" button next to each processed file.
+
+### Scheduler
+
+A scheduling page is available at `/scheduler` to manually or automatically assign posting dates to your processed episodes:
+
+- Click the **Scheduler** button on the home page (or visit `/scheduler`) to view all episodes with their chosen title.
+- A publication calendar at the top displays all scheduled release dates for the current month.
+- Use **Auto-Schedule All** to automatically propose posting dates based on your selected cadence (daily, weekly, or every N days). Make sure you've chosen a title for each unscheduled episode first.
+- Manually set each episode’s date/time and select **publish destinations** (YouTube, Spotify, Apple Podcasts) using the form controls, then click **Save**. You cannot schedule an episode until a title has been selected.
+
+- A loading spinner overlay will appear while scheduling operations are in progress, so you know when the page is working.
+
+
+File: chatgpt.txt
+
+
+File: clipmato/__init__.py
+
+
+File: clipmato/agents/__init__.py
+"""
+Clipmato agents package with plugin support.
+
+Drop a new module in this directory defining an Agent instance named *_agent,
+and it will be auto-discovered.
+"""
+import pkgutil
+import importlib
+
+__all__ = []
+_agents = {}
+
+for _finder, module_name, _ispkg in pkgutil.iter_modules(__path__):
+    if module_name.startswith("_"):
+        continue
+    module = importlib.import_module(f"{__name__}.{module_name}")
+    for attr in dir(module):
+        if attr.endswith("_agent"):
+            agent = getattr(module, attr)
+            globals()[attr] = agent
+            __all__.append(attr)
+            _agents[agent.name] = agent
+
+def list_agents() -> dict[str, object]:
+    """Return mapping of agent display names to Agent instances."""
+    return dict(_agents)
+
+def get_agent(name: str) -> object | None:
+    """Get an Agent instance by its display name."""
+    return _agents.get(name)
+
+
+File: clipmato/agents/audio_editor.py
+from agents import Agent
+
+audio_editor_agent = Agent(
+    name="Audio Editor",
+    instructions="""
+You are responsible for basic audio cleanup. Reply with a confirmation message when done.
+""",
+)
+
+
+File: clipmato/agents/content_curator.py
+from agents import Agent
+
+content_curator_agent = Agent(
+    name="Content Curator",
+    instructions="""
+You suggest interesting podcast topics based on current trends. Keep the responses short.
+""",
+)
+
+
+File: clipmato/agents/description_generator.py
+from agents import Agent
+
+description_generator_agent = Agent(
+    name="Description Generator",
+    instructions="""
+You are a podcast assistant that creates both a short and a long description for a given transcript.
+Return a JSON object with the keys "short_description" (a one-sentence summary)
+and "long_description" (a 3-4 sentence paragraph providing more detail).
+""",
+)
+
+File: clipmato/agents/distributor.py
+from agents import Agent
+
+distributor_agent = Agent(
+    name="Distributor",
+    instructions="""
+Publish the podcast episode and confirm publication.
+""",
+)
+
+
+File: clipmato/agents/entity_extractor.py
+from agents import Agent
+
+entity_extractor_agent = Agent(
+    name="Entity Extractor",
+    instructions="""
+You extract referenced people and locations from the podcast transcript.
+Return a JSON object with two keys: "people" (list of people's names)
+and "locations" (list of place names). Use empty lists if none are found.
+""",
+)
+
+File: clipmato/agents/scheduler_agent.py
+from agents import Agent
+
+scheduler_agent = Agent(
+    name="Scheduler Agent",
+    instructions="""
+You are a scheduling assistant. You receive a JSON object containing:
+- "cadence": one of "daily", "weekly", or "every_n"
+- "n_days": integer number of days for "every_n" (or null)
+- "episodes": an array of objects with "id", "title", and "description"
+
+Based on the cadence, assign each episode a posting datetime in ISO 8601 UTC.
+Return a JSON object mapping episode IDs to ISO datetime strings.
+""",
+)
+
+File: clipmato/agents/script_writer.py
+from agents import Agent
+
+script_writer_agent = Agent(
+    name="Script Writer",
+    instructions="""
+You create concise show notes and interview questions for the provided topic.
+Return a short paragraph and three questions.
+""",
+)
+
+
+File: clipmato/agents/title_suggester.py
+from agents import Agent
+
+title_suggester_agent = Agent(
+    name="Title Suggester",
+    instructions="""
+You suggest 5 catchy and descriptive podcast episode titles based on the provided transcript.
+Return your suggestions as a JSON array of strings.
+""",
+)
+
+File: clipmato/cli/__init__.py
+"""Command-line and GUI entrypoints for Podcast Pipeline."""
+
+File: clipmato/cli/gui.py
+from .pipeline import run_pipeline
+from .ui import make_gui_app
+
+if __name__ == "__main__":
+    app = make_gui_app(run_pipeline)
+    app.mainloop()
+
+File: clipmato/cli/pipeline.py
+"""
+Run the full Clipmato production pipeline or import individual steps programmatically.
+"""
+from ..steps import curate_content, generate_script, edit_audio, distribute
+from .ui import run_cli
+
+def run_pipeline():
+    """Run the Clipmato production pipeline and return step outputs."""
+    topic = curate_content("Find a trending tech topic")
+    script = generate_script(topic)
+    edited_audio = edit_audio("process raw audio")
+    distribution = distribute(edited_audio)
+
+    return {
+        "topic": topic,
+        "script": script,
+        "edited_audio": edited_audio,
+        "distribution": distribution,
+    }
+
+def main():
+    """Run the Clipmato production pipeline in CLI mode."""
+    run_cli(run_pipeline)
+
+if __name__ == "__main__":
+    main()
+
+File: clipmato/cli/ui.py
+"""
+UI glue for Clipmato CLI and GUI: formatting pipeline outputs,
+and building CLI runner and Tkinter GUI application.
+"""
+import sys
+
+
+def format_outputs(outputs: dict) -> str:
+    """Format pipeline outputs as a human-readable string."""
+    return "\n\n".join(f"{key}: {value}" for key, value in outputs.items())
+
+
+def run_cli(run_fn):
+    """Run the pipeline in CLI mode: execute run_fn and print formatted outputs."""
+    outputs = run_fn()
+    print(format_outputs(outputs))
+
+
+def make_gui_app(run_fn):
+    """Build and return a Tkinter root window for the pipeline GUI."""
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        sys.stderr.write(
+            "Error: The tkinter module is not available. "
+            "Please install Tcl/Tk support and refer to README.md for details.\n"
+        )
+        sys.exit(1)
+
+    root = tk.Tk()
+    root.title("Clipmato")
+
+    def on_run():
+        text.delete(1.0, tk.END)
+        text.insert(tk.END, format_outputs(run_fn()))
+
+    run_button = tk.Button(root, text="Run Pipeline", command=on_run)
+    run_button.pack(pady=10)
+
+    text = tk.Text(root, width=80, height=20)
+    text.pack()
+
+    return root
+
+File: clipmato/config.py
+"""
+Configuration constants for Clipmato: template paths, static files,
+uploads directory, metadata file, progress mapping, and default parameters.
+"""
+from pathlib import Path
+
+# Base directory of the Clipmato package
+BASE_DIR = Path(__file__).parent
+
+# Templates and static files
+from fastapi.templating import Jinja2Templates
+TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+STATIC_DIR = BASE_DIR / "static"
+
+# Uploads and metadata paths
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+METADATA_PATH = UPLOAD_DIR / "metadata.json"
+
+# Mapping of pipeline stages to progress percentages
+STAGE_PROGRESS: dict[str, int] = {
+    "transcribing": 20,
+    "descriptions": 30,
+    "entities": 40,
+    "titles": 50,
+    "script": 60,
+    "remove_silence": 65,
+    "editing": 75,
+    "distribution": 90,
+    "complete": 100,
+}
+
+# Silence-removal defaults (milliseconds/db)
+MIN_SILENCE_LEN_MS = 1000
+SILENCE_THRESH_DB = -50
+KEEP_SILENCE_MS = 200
+
+# Transcription defaults and FFmpeg parameters
+AUDIO_ONLY_EXTENSIONS = {"flac", "m4a", "mp3", "mpga", "oga", "ogg", "wav"}
+WHISPER_MODEL = "whisper-1"
+MAX_CHUNK_SIZE_BYTES = 25 * 1024 * 1024  # 25MB limit for Whisper API
+FFMPEG_AUDIO_CODEC = "pcm_s16le"
+FFMPEG_SAMPLE_RATE = 16000
+FFMPEG_CHANNELS = 1
+
+# Scheduling defaults
+DEFAULT_CADENCE = "daily"
+CADENCE_INTERVALS: dict[str, dict[str, int]] = {
+    DEFAULT_CADENCE: {"days": 1},
+    "weekly": {"weeks": 1},
+}
+DEFAULT_PUBLISH_HOUR = 9
+
+File: clipmato/dependencies.py
+"""
+Dependency providers for Clipmato Web/API layer: templates, file I/O,
+metadata, progress tracking, file processing, and scheduling services.
+"""
+import logging
+
+from fastapi.templating import Jinja2Templates
+
+from .config import TEMPLATES, UPLOAD_DIR
+from .utils.file_io import save_upload_file
+from .utils.metadata import read_metadata, update_metadata, remove_metadata
+from .utils.progress import update_progress, read_progress, enrich_with_progress
+from .services.file_processing import process_file_async
+from .services.scheduling import propose_schedule_async
+
+logger = logging.getLogger(__name__)
+
+
+class FileIOService:
+    """Service for handling file uploads."""
+
+    def __init__(self):
+        self.upload_dir = UPLOAD_DIR
+
+    def save(self, upload_file):
+        return save_upload_file(upload_file)
+
+
+class MetadataService:
+    """Service for reading, updating, and removing metadata records."""
+
+    def read(self):
+        return read_metadata()
+
+    def update(self, record_id: str, data: dict):
+        return update_metadata(record_id, data)
+
+    def remove(self, record_id: str):
+        return remove_metadata(record_id)
+
+
+class ProgressService:
+    """Service for tracking and reading pipeline progress."""
+
+    def update(self, record_id: str, stage: str, message: str | None = None):
+        return update_progress(record_id, stage, message)
+
+    def read(self, record_id: str):
+        return read_progress(record_id)
+
+    def enrich(self, records: list[dict]):
+        return enrich_with_progress(records)
+
+
+class ProcessingService:
+    """Service for asynchronous file processing pipeline."""
+
+    async def process(self, *args, **kwargs):
+        return await process_file_async(*args, **kwargs)
+
+
+class SchedulingService:
+    """Service for proposing and applying schedules."""
+
+    async def propose(self, *args, **kwargs):
+        return await propose_schedule_async(*args, **kwargs)
+
+
+def get_templates() -> Jinja2Templates:
+    """Dependency: Jinja2 templates instance."""
+    return TEMPLATES
+
+
+def get_file_io_service() -> FileIOService:
+    """Dependency: File IO service instance."""
+    return FileIOService()
+
+
+def get_metadata_service() -> MetadataService:
+    """Dependency: Metadata service instance."""
+    return MetadataService()
+
+
+def get_progress_service() -> ProgressService:
+    """Dependency: Progress tracking service instance."""
+    return ProgressService()
+
+
+def get_processing_service() -> ProcessingService:
+    """Dependency: Processing service instance."""
+    return ProcessingService()
+
+
+def get_scheduling_service() -> SchedulingService:
+    """Dependency: Scheduling service instance."""
+    return SchedulingService()
+
+File: clipmato/gui.py
+"""
+GUI entrypoint for running the Clipmato pipeline via Tkinter.
+"""
+from .cli.gui import run
+
+if __name__ == "__main__":
+    run()
+
+File: clipmato/orchestrator.py
+"""Pipeline orchestration framework for Clipmato:
+Defines a Step interface and Pipeline class so stages are pluggable components.
+"""
+import asyncio
+from typing import Any, Callable, Sequence, Union
+
+from .services.service_utils import run_stage
+
+
+class Step:
+    """
+    A single pipeline stage wrapping a service function with progress tracking.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        func: Callable[..., Any],
+        input_keys: Sequence[str],
+        output_keys: Union[str, Sequence[str]],
+        to_thread: bool = False,
+        log_result: Callable[[Any], str] | None = None,
+    ):
+        self.name = name
+        self.func = func
+        self.input_keys = list(input_keys)
+        if isinstance(output_keys, (list, tuple)):
+            self.output_keys = list(output_keys)
+        else:
+            self.output_keys = [output_keys]
+        self.to_thread = to_thread
+        self.log_result = log_result
+
+    async def run(self, ctx: dict[str, Any]) -> None:
+        args = [ctx[key] for key in self.input_keys]
+        result = await run_stage(
+            ctx["rec_id"],
+            self.name,
+            self.func,
+            *args,
+            to_thread=self.to_thread,
+            log_result=self.log_result,
+        )
+        if len(self.output_keys) == 1:
+            ctx[self.output_keys[0]] = result
+        else:
+            for key, val in zip(self.output_keys, result):
+                ctx[key] = val
+
+
+class Pipeline:
+    """
+    Orchestrates a sequence of Step instances.
+    """
+
+    def __init__(self, steps: list[Step]):
+        self.steps = steps
+
+    async def run(self, ctx: dict[str, Any]) -> dict[str, Any]:
+        for step in self.steps:
+            await step.run(ctx)
+        return ctx
+
+File: clipmato/pipeline.py
+"""
+Run the full Clipmato production pipeline or import individual steps programmatically.
+"""
+from .cli.pipeline import run_pipeline, main
+
+if __name__ == "__main__":
+    main()
+
+File: clipmato/routers/__init__.py
+"""
+API router modules for web app endpoints.
+
+Drop a new module defining a FastAPI `router` instance to have it included automatically.
+"""
+import pkgutil
+import importlib
+
+__all__ = []
+routers = []
+
+for _finder, module_name, _ispkg in pkgutil.iter_modules(__path__):
+    if module_name.startswith("_"):
+        continue
+    module = importlib.import_module(f"{__name__}.{module_name}")
+    if hasattr(module, "router"):
+        routers.append(module.router)
+        __all__.append(module_name)
+
+def list_routers() -> list:
+    """Return list of FastAPI routers discovered in this package."""
+    return list(routers)
+
+File: clipmato/routers/record.py
+"""
+Routes for viewing and managing individual episode records.
+"""
+from fastapi import APIRouter, Request, HTTPException, Form, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
+from pathlib import Path
+
+from ..dependencies import (
+    get_templates,
+    get_metadata_service,
+    get_file_io_service,
+)
+
+router = APIRouter()
+
+
+@router.get("/record/{record_id}", response_class=HTMLResponse)
+async def record_detail(
+    request: Request,
+    record_id: str,
+    templates=Depends(get_templates),
+    metadata_svc=Depends(get_metadata_service),
+):
+    """Show detailed view for a processed record."""
+    records = metadata_svc.read()
+    record = next((it for it in records if it.get("id") == record_id), None)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return templates.TemplateResponse(
+        "record.html", {"request": request, "record": record}
+    )
+
+
+@router.post("/record/{record_id}/title", response_class=HTMLResponse)
+async def select_title(
+    record_id: str,
+    selected_title: str = Form(...),
+    metadata_svc=Depends(get_metadata_service),
+):
+    """Handle the user selection of a title for a processed record."""
+    records = metadata_svc.read()
+    record = next((it for it in records if it.get("id") == record_id), None)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    metadata_svc.update(record_id, {"selected_title": selected_title})
+    return RedirectResponse(url=f"/record/{record_id}", status_code=303)
+
+
+@router.post("/record/{record_id}/delete")
+async def delete_record(
+    record_id: str,
+    metadata_svc=Depends(get_metadata_service),
+    file_io=Depends(get_file_io_service),
+):
+    """Delete a processed record and its associated files."""
+    rec = metadata_svc.remove(record_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Record not found")
+    src = Path(file_io.upload_dir) / rec.get("filename", "")
+    if src.exists():
+        try:
+            src.unlink()
+        except Exception:
+            pass
+    dst = src.with_suffix('.wav')
+    if dst.exists():
+        try:
+            dst.unlink()
+        except Exception:
+            pass
+    return RedirectResponse(url="/", status_code=303)
+
+File: clipmato/routers/scheduler.py
+"""
+Routes for scheduling episodes, both manual and automatic.
+"""
+from fastapi import APIRouter, Request, HTTPException, Form, Depends
+import calendar
+import logging
+from datetime import datetime
+from fastapi.responses import HTMLResponse, RedirectResponse
+
+from ..dependencies import (
+    get_templates,
+    get_metadata_service,
+    get_scheduling_service,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+@router.get("/scheduler", response_class=HTMLResponse)
+async def scheduler_page(
+    request: Request,
+    templates=Depends(get_templates),
+    metadata_svc=Depends(get_metadata_service),
+):
+    """Show the scheduling page for manual or automatic scheduling."""
+    records = metadata_svc.read()
+    today = datetime.today()
+    year = today.year
+    month = today.month
+    cal = calendar.monthcalendar(year, month)
+    events: list[dict] = []
+    for rec in records:
+        st = rec.get("schedule_time")
+        if st:
+            dt = datetime.fromisoformat(st)
+            if dt.year == year and dt.month == month:
+                events.append({
+                    "day": dt.day,
+                    "time": dt.strftime("%I:%M %p"),
+                    "title": rec.get("selected_title") or rec.get("filename", ""),
+                })
+    return templates.TemplateResponse(
+        "scheduler.html",
+        {
+            "request": request,
+            "records": records,
+            "calendar": cal,
+            "month": month,
+            "year": year,
+            "month_name": calendar.month_name[month],
+            "events": events,
+        },
+    )
+
+
+@router.post("/scheduler/auto", response_class=RedirectResponse)
+async def scheduler_auto(
+    cadence: str = Form("daily"),
+    n_days: int | None = Form(None),
+    metadata_svc=Depends(get_metadata_service),
+    scheduling_svc=Depends(get_scheduling_service),
+):
+    """Automatically propose and save schedule times for unscheduled records."""
+    logger.info(
+        "Auto-scheduling request: cadence=%s, n_days=%s",
+        cadence,
+        n_days,
+    )
+    records = metadata_svc.read()
+    # schedule all unscheduled records (titles optional)
+    unscheduled = [rec for rec in records if not rec.get("schedule_time")]
+    if unscheduled:
+        suggestions = await scheduling_svc.propose(unscheduled, cadence=cadence, n_days=n_days)
+        for rid, stime in suggestions.items():
+            metadata_svc.update(rid, {"schedule_time": stime})
+    return RedirectResponse(url="/scheduler", status_code=303)
+
+
+@router.post("/record/{record_id}/schedule", response_class=RedirectResponse)
+async def schedule_record(
+    record_id: str,
+    schedule_time: str = Form(...),
+    publish_targets: list[str] = Form([]),
+    metadata_svc=Depends(get_metadata_service),
+):
+    """Handle manual scheduling and publish-target selection for a single record."""
+    records = metadata_svc.read()
+    record = next((it for it in records if it.get("id") == record_id), None)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    metadata_svc.update(record_id, {"schedule_time": schedule_time, "publish_targets": publish_targets})
+    return RedirectResponse(url="/scheduler", status_code=303)
+
+File: clipmato/routers/upload.py
+"""
+Routes for handling file uploads and rendering upload/index pages.
+"""
+from fastapi import APIRouter, File, UploadFile, Request, Form, BackgroundTasks, Depends
+from fastapi.responses import HTMLResponse, JSONResponse
+from uuid import uuid4
+
+from ..dependencies import (
+    get_templates,
+    get_file_io_service,
+    get_processing_service,
+    get_metadata_service,
+    get_progress_service,
+)
+
+router = APIRouter()
+
+
+@router.get("/", response_class=HTMLResponse)
+async def index(
+    request: Request,
+    templates=Depends(get_templates),
+    metadata_svc=Depends(get_metadata_service),
+    progress_svc=Depends(get_progress_service),
+):
+    """Serve the upload form and list of processed files."""
+    records = progress_svc.enrich(metadata_svc.read())
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "records": records}
+    )
+
+
+@router.post("/upload")
+async def upload(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    remove_silence: bool = Form(False),
+    file_io=Depends(get_file_io_service),
+    processing_svc=Depends(get_processing_service),
+    progress_svc=Depends(get_progress_service),
+) -> JSONResponse:
+    """Handle uploaded file: save it, enqueue processing, and return a job ID."""
+    file_path = file_io.save(file)
+    record_id = str(uuid4())
+    # mark the pipeline as starting (after upload)
+    progress_svc.update(record_id, "transcribing")
+    # process the file in background (updates metadata and final status)
+    background_tasks.add_task(
+        processing_svc.process,
+        file_path,
+        file.filename,
+        record_id,
+        remove_silence,
+    )
+    return JSONResponse({"id": record_id})
+
+
+@router.get("/progress/{record_id}")
+async def progress(
+    record_id: str,
+    progress_svc=Depends(get_progress_service),
+) -> JSONResponse:
+    """Return the current progress status for a given job ID."""
+    status = progress_svc.read(record_id)
+    return JSONResponse(status)
+
+
+File: clipmato/services/__init__.py
+"""Service modules for file processing and scheduling."""
+
+File: clipmato/services/file_processing.py
+from __future__ import annotations
+
+import asyncio
+import logging
+from uuid import uuid4
+from datetime import datetime
+
+from ..steps.transcription import transcribe_audio
+from ..steps.description_generation import generate_descriptions_async
+from ..steps.entity_extraction import extract_entities_async
+from ..steps.title_suggestion import propose_titles_async
+from ..steps.script_generation import generate_script_async
+from ..steps.audio_editing import edit_audio_async
+from ..steps.distribution import distribute_async
+from ..utils.progress import update_progress
+from ..utils.metadata import append_metadata
+from ..steps.silence_removal import remove_silence as remove_silence_step
+from typing import Any
+from ..orchestrator import Step, Pipeline
+
+async def process_file_async(
+    file_path: str,
+    filename: str,
+    record_id: str | None = None,
+    remove_silence: bool = False,
+) -> dict:
+    """
+    Process an uploaded file through transcription, description & entity extraction,
+    title suggestion, scripting, editing, and distribution. Returns a metadata record.
+    If record_id is provided, it will be used; otherwise a new UUID is generated.
+    Progress is emitted via the progress status file at each stage.
+    """
+    rec_id = record_id or str(uuid4())
+    logger = logging.getLogger(__name__)
+    logger.info(f"[{rec_id}] Starting processing file {file_path}, remove_silence={remove_silence}")
+
+    context: dict[str, Any] = {
+        "rec_id": rec_id,
+        "file_path": file_path,
+        "filename": filename,
+    }
+
+    steps: list[Step] = [
+        Step(
+            "transcribing",
+            transcribe_audio,
+            input_keys=["file_path"],
+            output_keys="transcript",
+            to_thread=True,
+            log_result=lambda r: f"{len(r)} characters",
+        ),
+        Step(
+            "descriptions",
+            generate_descriptions_async,
+            input_keys=["transcript"],
+            output_keys="desc",
+        ),
+        Step(
+            "entities",
+            extract_entities_async,
+            input_keys=["transcript"],
+            output_keys="entities",
+        ),
+        Step(
+            "titles",
+            propose_titles_async,
+            input_keys=["transcript"],
+            output_keys="titles",
+        ),
+        Step(
+            "script",
+            generate_script_async,
+            input_keys=["transcript"],
+            output_keys="script",
+        ),
+        Step(
+            "editing",
+            edit_audio_async,
+            input_keys=["file_path"],
+            output_keys="edited_audio",
+            log_result=lambda p: f"output file: {p}",
+        ),
+    ]
+    if remove_silence:
+        steps.append(
+            Step(
+                "remove_silence",
+                remove_silence_step,
+                input_keys=["edited_audio"],
+                output_keys=["original_duration", "trimmed_duration", "edited_audio"],
+                to_thread=True,
+                log_result=lambda res: f"original={res[0]:.2f}s trimmed={res[1]:.2f}s",
+            )
+        )
+    steps.append(
+        Step(
+            "distribution",
+            distribute_async,
+            input_keys=["edited_audio"],
+            output_keys="distribution",
+        )
+    )
+
+    try:
+        context = await Pipeline(steps).run(context)
+
+        desc = context["desc"]
+        entities = context["entities"]
+
+        record: dict[str, Any] = {
+            "id": rec_id,
+            "filename": filename,
+            "upload_time": datetime.utcnow().isoformat(),
+            "transcript": context["transcript"],
+            "titles": context["titles"],
+            "selected_title": None,
+            "short_description": desc.get("short_description", ""),
+            "long_description": desc.get("long_description", ""),
+            "people": entities.get("people", []),
+            "locations": entities.get("locations", []),
+            "script": context["script"],
+            "edited_audio": context["edited_audio"],
+            "distribution": context["distribution"],
+        }
+        if remove_silence:
+            record["original_duration"] = context["original_duration"]
+            record["trimmed_duration"] = context["trimmed_duration"]
+
+        append_metadata(record)
+        update_progress(rec_id, "complete")
+        return record
+    except Exception as exc:
+        logger.exception(f"[{rec_id}] Error during file processing")
+        err_msg = str(exc)
+        update_progress(rec_id, "error", err_msg)
+        record = {
+            "id": rec_id,
+            "filename": filename,
+            "upload_time": datetime.utcnow().isoformat(),
+            "error": err_msg,
+        }
+        append_metadata(record)
+        return record
+
+
+File: clipmato/services/scheduling.py
+"""
+Utilities for schedule suggestion: dummy implementation and Agent-based.
+"""
+import json
+import logging
+from datetime import datetime, timedelta
+
+from agents import Runner
+from ..agents.scheduler_agent import scheduler_agent
+from .service_utils import with_fallback
+from ..config import DEFAULT_CADENCE, CADENCE_INTERVALS, DEFAULT_PUBLISH_HOUR
+
+logger = logging.getLogger(__name__)
+
+def generate_dummy_schedule(
+    records: list[dict], cadence: str = DEFAULT_CADENCE, n_days: int | None = None
+) -> dict[str, str]:
+    """
+    Generate a simple dummy schedule based on cadence:
+    - 'daily': one per day starting tomorrow at 09:00 UTC
+    - 'weekly': one per week starting one week from today at 09:00 UTC
+    - 'every_n': one every n_days starting n_days from today at 09:00 UTC
+    Returns a mapping of record IDs to ISO8601 datetime strings.
+    """
+    schedule: dict[str, str] = {}
+    now = datetime.utcnow()
+    if cadence in CADENCE_INTERVALS:
+        interval = timedelta(**CADENCE_INTERVALS[cadence])
+        start = now + interval
+    elif cadence == "every_n" and n_days:
+        interval = timedelta(days=n_days)
+        start = now + interval
+    else:
+        # default cadence interval
+        interval = timedelta(**CADENCE_INTERVALS[DEFAULT_CADENCE])
+        start = now + interval
+
+    for idx, rec in enumerate(records):
+        dt = start + interval * idx
+        dt = dt.replace(
+            hour=DEFAULT_PUBLISH_HOUR,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        schedule[rec["id"]] = dt.isoformat()
+    return schedule
+
+@with_fallback(generate_dummy_schedule)
+async def propose_schedule_async(
+    records: list[dict], cadence: str = "daily", n_days: int | None = None
+) -> dict[str, str]:
+    """
+    Use the Scheduler Agent to propose posting schedule given cadence.
+    Falls back to a dummy schedule on failure via decorator.
+    """
+    logger.info(
+        "propose_schedule_async: cadence=%s, n_days=%s, records=%d",
+        cadence,
+        n_days,
+        len(records),
+    )
+    prompt = json.dumps(
+        {
+            "cadence": cadence,
+            "n_days": n_days,
+            "episodes": [
+                {"id": rec["id"], "title": rec.get("selected_title"), "description": rec.get("long_description")}
+                for rec in records
+            ],
+        }
+    )
+    result = await Runner.run(scheduler_agent, prompt)
+    schedules = json.loads(result.final_output)
+    if not isinstance(schedules, dict):
+        raise ValueError("Scheduler agent returned invalid schedule format")
+    return schedules
+
+File: clipmato/services/service_utils.py
+"""
+Helper functions and decorators for service layer tasks:
+progress tracking, logging, and error handling.
+"""
+import asyncio
+import logging
+from typing import Any, Callable, Optional
+
+from ..utils.progress import update_progress
+
+logger = logging.getLogger(__name__)
+
+async def run_stage(
+    rec_id: str,
+    stage: str,
+    func,
+    *args,
+    to_thread: bool = False,
+    log_result: Optional[Callable[[Any], str]] = None,
+) -> Any:
+    """
+    Run a service stage: update progress, log start/end, and execute the function.
+
+    Args:
+        rec_id: record ID for progress tracking and logging.
+        stage: name of the pipeline stage.
+        func: the sync or async function to execute.
+        *args: positional args to pass to func.
+        to_thread: whether to invoke func via asyncio.to_thread.
+        log_result: optional function(result) -> str for result logging.
+
+    Returns:
+        The return value from func.
+
+    Raises:
+        Any exception raised by func is propagated after logging.
+    """
+    update_progress(rec_id, stage)
+    logger.info(f"[{rec_id}] Starting stage '{stage}'")
+    try:
+        if to_thread:
+            result = await asyncio.to_thread(func, *args)
+        else:
+            result = await func(*args)
+        if log_result:
+            logger.info(f"[{rec_id}] Stage '{stage}' result: {log_result(result)}")
+        else:
+            logger.info(f"[{rec_id}] Completed stage '{stage}'")
+        return result
+    except Exception:
+        logger.exception(f"[{rec_id}] Exception in stage '{stage}'")
+        raise
+
+def with_fallback(fallback_func):
+    """
+    Decorator for service functions that fall back to a default on exception.
+
+    Args:
+        fallback_func: call with same args to generate fallback result.
+    """
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except Exception:
+                logger.exception(f"Service '{func.__name__}' failed, using fallback")
+                return fallback_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+File: clipmato/static/app.js
+document.addEventListener('DOMContentLoaded', () => {
+  const dropZone = document.getElementById('drop_zone');
+  const fileInput = document.getElementById('file_input');
+  const fileSelectBtn = document.getElementById('file_select_btn');
+
+  const recordsContainer = document.getElementById('records_container');
+
+  const recordControls = document.getElementById('record_controls');
+  const recordScreenBtn = document.getElementById('record_screen_btn');
+  const recordWebcamBtn = document.getElementById('record_webcam_btn');
+  const recordBothBtn = document.getElementById('record_both_btn');
+  let mediaRecorder;
+  let mediaChunks = [];
+  const STAGE_INFO = {
+    uploading:   { label: 'Uploading file...',       percent: 10 },
+    transcribing:{ label: 'Transcribing audio...',    percent: 20 },
+    descriptions:{ label: 'Generating descriptions...',percent: 30 },
+    entities:    { label: 'Extracting entities...',    percent: 40 },
+    titles:      { label: 'Suggesting titles...',     percent: 50 },
+    script:      { label: 'Generating script...',     percent: 60 },
+    remove_silence: { label: 'Removing silence...',     percent: 65 },
+    editing:     { label: 'Editing audio...',         percent: 75 },
+    distribution:{ label: 'Distributing audio...',     percent: 90 },
+    complete:    { label: 'Finalizing...',            percent:100 },
+  };
+
+  function createJobCard(initialId, fileName) {
+    const col = document.createElement('div');
+    col.className = 'col';
+    col.id = `rec_${initialId}`;
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    const body = document.createElement('div');
+    body.className = 'card-body d-flex flex-column';
+    const title = document.createElement('h5');
+    title.className = 'card-title';
+    title.textContent = fileName;
+    const time = document.createElement('p');
+    time.className = 'card-text text-muted mb-1';
+    time.textContent = new Date().toLocaleString();
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-info mb-2';
+    badge.textContent = `${STAGE_INFO.uploading.label} (0%)`;
+    const progDiv = document.createElement('div');
+    progDiv.className = 'progress mb-2';
+    const progBar = document.createElement('div');
+    progBar.className = 'progress-bar';
+    progBar.setAttribute('role', 'progressbar');
+    progBar.style.width = '0%';
+    progBar.textContent = '0%';
+    progDiv.appendChild(progBar);
+    body.append(title, time, badge, progDiv);
+    card.appendChild(body);
+    col.appendChild(card);
+    recordsContainer.prepend(col);
+    return { badge, progBar, cardBody: body, col };
+  }
+
+  const handleFile = (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const removeSilence = document.getElementById('remove_silence_checkbox').checked;
+    formData.append('remove_silence', removeSilence);
+    const placeholderId = Date.now().toString();
+    const { badge, progBar, cardBody, col } = createJobCard(placeholderId, file.name);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload');
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * STAGE_INFO.uploading.percent);
+        badge.textContent = `${STAGE_INFO.uploading.label} (${pct}%)`;
+        progBar.style.width = pct + '%';
+        progBar.textContent = pct + '%';
+      }
+    });
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const resp = JSON.parse(xhr.responseText || '{}');
+        const jobId = resp.id;
+        col.id = `rec_${jobId}`;
+        badge.textContent = STAGE_INFO.transcribing.label + ` (0%)`;
+        progBar.style.width = STAGE_INFO.transcribing.percent + '%';
+        progBar.textContent = STAGE_INFO.transcribing.percent + '%';
+        const poll = setInterval(async () => {
+          try {
+            const r = await fetch(`/progress/${jobId}`);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const stat = await r.json();
+            if (stat.stage === 'error') {
+              clearInterval(poll);
+              badge.className = 'badge bg-danger mb-2';
+              badge.textContent = `Error: ${stat.message || 'processing failed'}`;
+              return;
+            }
+            const info = STAGE_INFO[stat.stage];
+            if (info) {
+              badge.textContent = `${info.label} (${stat.progress}%)`;
+              progBar.style.width = stat.progress + '%';
+              progBar.textContent = stat.progress + '%';
+            }
+            if (stat.progress >= 100) {
+              clearInterval(poll);
+              badge.className = 'badge bg-success mb-2';
+              badge.textContent = 'Completed';
+              const link = document.createElement('a');
+              link.href = `/record/${jobId}`;
+              link.className = 'btn btn-primary btn-sm me-2';
+              link.textContent = 'Details';
+              cardBody.appendChild(link);
+            }
+          } catch (err) {
+            clearInterval(poll);
+            badge.className = 'badge bg-danger mb-2';
+            badge.textContent = `Error: ${err.message}`;
+          }
+        }, 1000);
+      } else {
+        badge.className = 'badge bg-danger mb-2';
+        badge.textContent = `Upload failed (${xhr.status})`;
+      }
+    };
+    xhr.onerror = () => {
+      badge.className = 'badge bg-danger mb-2';
+      badge.textContent = 'Upload error';
+    };
+    xhr.send(formData);
+  };
+
+  const startRecording = async (captureScreen, captureWebcam) => {
+    const streams = [];
+    if (captureScreen) {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: captureWebcam });
+      streams.push(screenStream);
+      if (!captureWebcam) {
+        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streams.push(micStream);
+      }
+    }
+    if (captureWebcam) {
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streams.push(camStream);
+    }
+    const tracks = streams.flatMap(s => s.getTracks());
+    const stream = new MediaStream(tracks);
+    mediaChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => mediaChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(mediaChunks, { type: mediaChunks[0]?.type });
+      const file = new File([blob], 'recording.webm', { type: blob.type });
+      handleFile(file);
+      recordScreenBtn.disabled = false;
+      recordWebcamBtn.disabled = false;
+      recordBothBtn.disabled = false;
+      stopBtn.remove();
+    };
+    const stopBtn = document.createElement('button');
+    stopBtn.textContent = 'Stop Recording';
+    stopBtn.className = 'btn btn-danger ms-2';
+    stopBtn.onclick = () => mediaRecorder.stop();
+    recordControls.appendChild(stopBtn);
+    recordScreenBtn.disabled = true;
+    recordWebcamBtn.disabled = true;
+    recordBothBtn.disabled = true;
+    mediaRecorder.start();
+  };
+
+  recordScreenBtn.addEventListener('click', () => startRecording(true, false));
+  recordWebcamBtn.addEventListener('click', () => startRecording(false, true));
+  recordBothBtn.addEventListener('click', () => startRecording(true, true));
+
+  fileSelectBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      handleFile(fileInput.files[0]);
+    }
+  });
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('hover');
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('hover');
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('hover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFile(files[0]);
+    }
+  });
+});
+
+File: clipmato/static/style.css
+/* Base styling */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f2f2f5;
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+.container {
+  max-width: 960px;
+}
+
+#drop_zone {
+  border: 2px dashed #bbb;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  min-height: 180px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: #666;
+  margin: 2rem auto;
+  font-size: 1.25rem;
+  background-color: #fafafa;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+#drop_zone.hover {
+  border-color: #007aff;
+  color: #007aff;
+  background-color: #f5f5f5;
+}
+
+#drop_zone button {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+#drop_zone button:hover {
+  background-color: #0065d1;
+  border-color: #0065d1;
+}
+
+.btn-primary {
+  background-color: #007aff;
+  border-color: #007aff;
+  font-size: 1rem;
+  padding: 0.6rem 1.25rem;
+}
+
+.btn-primary:hover {
+  background-color: #0065d1;
+  border-color: #0065d1;
+}
+
+pre {
+  background: #fafafa;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.card-title {
+  font-weight: 500;
+}
+
+#records_list {
+  list-style-type: none;
+  padding-left: 0;
+  margin-top: 1rem;
+}
+
+#records_list li {
+  margin: 0.5rem 0;
+}
+
+/* Loading overlay with CSS spinner */
+#loading {
+  position: fixed;
+  pointer-events: none;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(255,255,255,0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+#loading.show {
+  display: flex;
+}
+
+#loading .spinner {
+  border: 12px solid #f3f3f3;
+  border-top: 12px solid #3498db;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Heading and navbar styling */
+h1 {
+  font-size: 2.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+h2 {
+  font-size: 2rem;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.navbar-brand {
+  font-size: 1.75rem;
+}
+
+@media (max-width: 576px) {
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; }
+  .navbar-brand { font-size: 1.5rem; }
+  .btn { font-size: 1rem; }
+}
+
+File: clipmato/steps/__init__.py
+"""
+Clipmato pipeline steps with plugin support.
+
+Drop a new module in this directory defining step functions,
+and they will be auto-discovered.
+"""
+import pkgutil
+import importlib
+
+__all__ = []
+
+_SKIP_MODULES = {"step_utils"}
+
+for _finder, module_name, _ispkg in pkgutil.iter_modules(__path__):
+    if module_name in _SKIP_MODULES or module_name.startswith("_"):
+        continue
+    module = importlib.import_module(f"{__name__}.{module_name}")
+    for attr in dir(module):
+        if attr.startswith("_"):
+            continue
+        obj = getattr(module, attr)
+        if callable(obj) and getattr(obj, "__module__", None) == module.__name__:
+            globals()[attr] = obj
+            __all__.append(attr)
+
+File: clipmato/steps/audio_editing.py
+def edit_audio(audio_input: str) -> str:
+    """Basic audio editing stub: return the input audio path."""
+    return audio_input
+
+async def edit_audio_async(audio_input: str) -> str:
+    """Asynchronously basic audio editing stub: return the input audio path."""
+    return audio_input
+
+File: clipmato/steps/content_curation.py
+from ..agents.content_curator import content_curator_agent
+from .step_utils import run_agent_async, run_agent_sync
+
+
+def curate_content(prompt: str) -> str:
+    """Use the Content Curator agent to suggest a podcast topic."""
+    return run_agent_sync(
+        content_curator_agent,
+        prompt,
+        default="",
+    )
+
+
+async def curate_content_async(prompt: str) -> str:
+    """Asynchronously use the Content Curator agent to suggest a podcast topic."""
+    return await run_agent_async(
+        content_curator_agent,
+        prompt,
+        default="",
+    )
+
+File: clipmato/steps/description_generation.py
+import json
+from ..agents.description_generator import description_generator_agent
+from .step_utils import run_agent_async
+
+
+async def generate_descriptions_async(transcript: str) -> dict[str, str]:
+    """
+    Use the Description Generator agent to create short and long descriptions.
+    Returns a dict with "short_description" and "long_description".
+    """
+    data = await run_agent_async(
+        description_generator_agent,
+        transcript,
+        default={},
+        parse_fn=json.loads,
+    )
+    return {
+        "short_description": data.get("short_description", ""),
+        "long_description": data.get("long_description", ""),
+    }
+
+File: clipmato/steps/distribution.py
+from ..agents.distributor import distributor_agent
+from .step_utils import run_agent_async, run_agent_sync
+
+
+def distribute(audio_output: str) -> str:
+    """Use the Distributor agent to publish the podcast episode."""
+    return run_agent_sync(
+        distributor_agent,
+        audio_output,
+        default="",
+    )
+
+
+async def distribute_async(audio_output: str) -> str:
+    """Asynchronously use the Distributor agent to publish the podcast episode."""
+    return await run_agent_async(
+        distributor_agent,
+        audio_output,
+        default="",
+    )
+
+File: clipmato/steps/entity_extraction.py
+import json
+from ..agents.entity_extractor import entity_extractor_agent
+from .step_utils import run_agent_async
+
+
+async def extract_entities_async(transcript: str) -> dict[str, list[str]]:
+    """
+    Use the Entity Extractor agent to pull people and locations from transcript.
+    Returns a dict with "people" and "locations" lists.
+    """
+    data = await run_agent_async(
+        entity_extractor_agent,
+        transcript,
+        default={},
+        parse_fn=json.loads,
+    )
+    return {
+        "people": data.get("people", []),
+        "locations": data.get("locations", []),
+    }
+
+File: clipmato/steps/script_generation.py
+from ..agents.script_writer import script_writer_agent
+from .step_utils import run_agent_async, run_agent_sync
+
+
+def generate_script(topic: str) -> str:
+    """Use the Script Writer agent to create show notes and questions."""
+    return run_agent_sync(
+        script_writer_agent,
+        topic,
+        default="",
+    )
+
+
+async def generate_script_async(topic: str) -> str:
+    """Asynchronously use the Script Writer agent to create show notes and questions."""
+    return await run_agent_async(
+        script_writer_agent,
+        topic,
+        default="",
+    )
+
+File: clipmato/steps/silence_removal.py
+from pathlib import Path
+from pydub import AudioSegment
+from pydub.silence import split_on_silence
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Monkey-patch builtins.buffer for Python 3 compatibility in pydub.pyaudioop
+import builtins
+builtins.buffer = memoryview
+
+# Monkey-patch pydub.pyaudioop._sample_count to use integer division (avoid float in range())
+import pydub.pyaudioop as pyaudioop
+pyaudioop._sample_count = lambda cp, size: len(cp) // size
+
+from ..config import MIN_SILENCE_LEN_MS, SILENCE_THRESH_DB, KEEP_SILENCE_MS
+
+def remove_silence(
+    audio_path: str,
+    min_silence_len: int = MIN_SILENCE_LEN_MS,
+    silence_thresh: int = SILENCE_THRESH_DB,
+    keep_silence: int = KEEP_SILENCE_MS,
+) -> tuple[float, float, str]:
+    """
+    Remove silent chunks from an audio file.
+    Returns a tuple of (original_duration_sec, trimmed_duration_sec, output_path).
+    """
+    src = Path(audio_path)
+    logger.info(
+        "remove_silence: input=%s, min_silence_len=%d, silence_thresh=%d, keep_silence=%d",
+        src,
+        min_silence_len,
+        silence_thresh,
+        keep_silence,
+    )
+    sound = AudioSegment.from_file(src)
+    original_duration = len(sound) / 1000.0
+    logger.info("remove_silence: original duration=%.2fs", original_duration)
+
+    # enforce integer thresholds (avoid floats in pydub range)
+    min_silence_len = int(min_silence_len)
+    silence_thresh = int(silence_thresh)
+    keep_silence = int(keep_silence)
+    logger.info(
+        "remove_silence: splitting (min_silence_len=%d, silence_thresh=%d, keep_silence=%d)",
+        min_silence_len,
+        silence_thresh,
+        keep_silence,
+    )
+    try:
+        chunks = split_on_silence(
+            sound,
+            min_silence_len=min_silence_len,
+            silence_thresh=silence_thresh,
+            keep_silence=keep_silence,
+        )
+    except Exception:
+        logger.exception("remove_silence: split_on_silence failed for %s", src)
+        raise
+    logger.info("remove_silence: %d chunks detected", len(chunks))
+
+    # build empty segment matching source parameters to avoid sample-width mismatch
+    combined = sound[:0]
+    for chunk in chunks:
+        combined += chunk
+    output_path = src.with_name(f"{src.stem}_trimmed{src.suffix}")
+    combined.export(output_path, format=src.suffix.lstrip('.'))
+    trimmed_duration = len(combined) / 1000.0
+    logger.info(
+        "remove_silence: trimmed duration=%.2fs, output=%s",
+        trimmed_duration,
+        output_path,
+    )
+    return original_duration, trimmed_duration, str(output_path)
+
+File: clipmato/steps/step_utils.py
+"""
+Utilities for defining agent-based pipeline steps in Clipmato.
+Provides generic synchronous and asynchronous runners with optional output parsing.
+"""
+import json
+import logging
+from typing import Any, Callable, Optional
+from agents import Runner
+
+logger = logging.getLogger(__name__)
+
+def parse_json(raw: str) -> Any:
+    """Parse a JSON-encoded string."""
+    return json.loads(raw)
+
+def parse_list(raw: str) -> list[Any]:
+    """Strip markdown code fences and parse JSON list or fallback to newline-split."""
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines.pop(0)
+        if lines and lines[-1].startswith("```"):
+            lines.pop(-1)
+        text = "\n".join(lines)
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return [line.strip() for line in text.splitlines() if line.strip()]
+
+async def run_agent_async(
+    agent: Any,
+    prompt: str,
+    *,
+    default: Any = None,
+    parse_fn: Callable[[str], Any] = lambda x: x,
+) -> Any:
+    """
+    Run the given agent asynchronously on the prompt and parse the output.
+    Default parse_fn returns raw string.
+    """
+    result = await Runner.run(agent, prompt)
+    raw = result.final_output.strip()
+    try:
+        return parse_fn(raw)
+    except Exception:
+        logger.exception("run_agent_async: parsing output failed")
+        return default
+
+def run_agent_sync(
+    agent: Any,
+    prompt: str,
+    *,
+    default: Any = None,
+    parse_fn: Callable[[str], Any] = lambda x: x,
+) -> Any:
+    """
+    Run the given agent synchronously on the prompt and parse the output.
+    Default parse_fn returns raw string.
+    """
+    result = Runner.run_sync(agent, prompt)
+    raw = result.final_output.strip()
+    try:
+        return parse_fn(raw)
+    except Exception:
+        logger.exception("run_agent_sync: parsing output failed")
+        return default
+
+File: clipmato/steps/title_suggestion.py
+import json
+import json
+from ..agents.title_suggester import title_suggester_agent
+from .step_utils import run_agent_async, run_agent_sync, parse_list
+
+
+def propose_titles(transcript: str) -> list[str]:
+    """Use the Title Suggester agent to propose 5 episode titles."""
+    return run_agent_sync(
+        title_suggester_agent,
+        transcript,
+        default=[],
+        parse_fn=parse_list,
+    ) or []
+
+
+async def propose_titles_async(transcript: str) -> list[str]:
+    """Asynchronously use the Title Suggester agent to propose 5 episode titles."""
+    return await run_agent_async(
+        title_suggester_agent,
+        transcript,
+        default=[],
+        parse_fn=parse_list,
+    ) or []
+
+File: clipmato/steps/transcription.py
+import os
+import subprocess
+import math
+import tempfile
+
+import os
+import subprocess
+import math
+import tempfile
+
+from pathlib import Path
+import logging
+from openai import OpenAI
+
+from ..config import (
+    AUDIO_ONLY_EXTENSIONS,
+    MAX_CHUNK_SIZE_BYTES,
+    WHISPER_MODEL,
+    FFMPEG_SAMPLE_RATE,
+    FFMPEG_CHANNELS,
+    FFMPEG_AUDIO_CODEC,
+)
+
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"), base_url="https://api.openai.com/v1"
+)
+logger = logging.getLogger(__name__)
+
+def transcribe_audio(audio_path: str, model: str = WHISPER_MODEL) -> str:
+    """
+    Transcribe an audio file to text using OpenAI's Whisper model.
+    Audio files larger than MAX_CHUNK_SIZE_BYTES will be split into
+    smaller segments, transcribed sequentially, and recombined.
+    """
+    src = Path(audio_path)
+    logger.info(f"transcribe_audio: input file {src}")
+    # Convert any non-audio-only file (e.g. video container) to WAV for Whisper
+    if src.suffix.lower().lstrip('.') not in AUDIO_ONLY_EXTENSIONS:
+        logger.info("transcribe_audio: non-audio-only format detected, converting to WAV")
+        probe = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "a",
+                "-show_entries", "stream=index",
+                "-of", "csv=p=0", str(src),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if not probe.stdout.strip():
+            raise RuntimeError(
+                "No audio track detected. "
+                "Please record with a microphone or choose webcam/screen+webcam recording."
+            )
+        dst = src.with_suffix('.wav')
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(src),
+                "-vn", "-acodec", FFMPEG_AUDIO_CODEC,
+                "-ar", str(FFMPEG_SAMPLE_RATE),
+                "-ac", str(FFMPEG_CHANNELS),
+                str(dst),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            err = proc.stderr.strip() or proc.stdout.strip()
+            logger.error(f"transcribe_audio: audio conversion failed: {err}")
+            raise RuntimeError(f"Audio conversion failed: {err}")
+        audio_path = str(dst)
+        src = Path(audio_path)
+
+    file_size = src.stat().st_size
+    logger.info(f"transcribe_audio: file size {file_size} bytes")
+    if file_size > MAX_CHUNK_SIZE_BYTES:
+        logger.info(
+            "transcribe_audio: file exceeds max chunk size (%d bytes), splitting audio",
+            MAX_CHUNK_SIZE_BYTES,
+        )
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(src),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        duration = float(result.stdout.strip())
+        num_chunks = math.ceil(file_size / MAX_CHUNK_SIZE_BYTES)
+        chunk_duration = math.ceil(duration / num_chunks)
+
+        transcripts: list[str] = []
+        with tempfile.TemporaryDirectory(dir=src.parent) as tmpdir:
+            pattern = Path(tmpdir) / f"chunk_%03d{src.suffix}"
+            logger.info(
+                "transcribe_audio: splitting into chunks with pattern %s, segment_time %ds",
+                pattern,
+                chunk_duration,
+            )
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(src),
+                    "-f",
+                    "segment",
+                    "-segment_time",
+                    str(chunk_duration),
+                    "-c",
+                    "copy",
+                    "-reset_timestamps",
+                    "1",
+                    str(pattern),
+                ],
+                check=True,
+            )
+            for chunk_file in sorted(Path(tmpdir).glob(f"chunk_*{src.suffix}")):
+                logger.info(f"transcribe_audio: transcribing chunk {chunk_file.name}")
+                with open(chunk_file, "rb") as audio_file:
+                    response = client.audio.transcriptions.create(
+                        file=audio_file,
+                        model=model,
+                        response_format="text",
+                    )
+                transcripts.append(response)
+                logger.info(f"transcribe_audio: completed chunk {chunk_file.name}")
+        return "\n".join(transcripts)
+
+    with open(audio_path, "rb") as audio_file:
+        logger.info("transcribe_audio: file size within limit, performing direct transcription")
+        response = client.audio.transcriptions.create(
+            file=audio_file,
+            model=model,
+            response_format="text",
+        )
+    logger.info("transcribe_audio: direct transcription complete")
+    return response
+
+File: clipmato/templates/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clipmato AI</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/">Clipmato AI</a>
+      <a href="/scheduler" class="btn btn-outline-primary">Scheduler</a>
+    </div>
+  </nav>
+  <div class="container pb-4">
+
+    <div id="drop_zone" class="border border-secondary rounded p-4 text-center mb-4" style="border-style: dashed;">
+      <p class="mb-2">Drop video or audio file here</p>
+      <button id="file_select_btn" class="btn btn-primary">Select a video or audio file</button>
+      <input type="file" id="file_input" style="display: none;">
+    </div>
+    <div class="form-check mb-4">
+      <input class="form-check-input" type="checkbox" id="remove_silence_checkbox">
+      <label class="form-check-label" for="remove_silence_checkbox">Remove silence</label>
+    </div>
+
+    <div id="record_controls" class="text-center mb-4">
+      <button id="record_screen_btn" class="btn btn-success me-2">Record Screen</button>
+      <button id="record_webcam_btn" class="btn btn-success me-2">Record Webcam</button>
+      <button id="record_both_btn" class="btn btn-success">Record Screen + Webcam</button>
+    </div>
+
+    <div class="mb-5">
+      <h2>Episode Dashboard</h2>
+      <div id="records_container" class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-4">
+        {% for rec in records %}
+        <div class="col" id="rec_{{ rec.id }}">
+          <div class="card h-100">
+            <div class="card-body d-flex flex-column">
+              <h5 class="card-title">{{ rec.selected_title or rec.filename }}</h5>
+              <p class="card-text text-muted mb-1">{{ rec.upload_time }}</p>
+              {% if rec.progress < 100 %}
+                {% if rec.stage == 'error' %}
+                  <span class="badge bg-danger mb-2">Error: {{ rec.message or rec.error }}</span>
+                {% else %}
+                  <span class="badge bg-info mb-2">{{ rec.stage.replace('_', ' ').capitalize() }} ({{ rec.progress }}%)</span>
+                  <div class="progress mb-2">
+                    <div class="progress-bar" role="progressbar" style="width: {{ rec.progress }}%;" aria-valuenow="{{ rec.progress }}" aria-valuemin="0" aria-valuemax="100">{{ rec.progress }}%</div>
+                  </div>
+                {% endif %}
+              {% endif %}
+              <div class="mt-auto">
+                {% if rec.progress >= 100 and not rec.error %}
+                  <a href="/record/{{ rec.id }}" class="btn btn-primary btn-sm me-2">Details</a>
+                {% endif %}
+                <form method="post" action="/record/{{ rec.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this record and file?');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bootstrap JS and application script -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+
+File: clipmato/templates/record.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clipmato - Episode Details: {{ record.filename }}</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/">Clipmato</a>
+      <a href="/scheduler" class="btn btn-outline-primary">Scheduler</a>
+    </div>
+  </nav>
+  <div class="container pb-4">
+    <h1 class="mb-3">Episode Details: {{ record.filename }}</h1>
+    <p><strong>Uploaded at:</strong> {{ record.upload_time }}</p>
+    {% if record.original_duration is defined %}
+    <p><strong>Original duration:</strong> {{ record.original_duration | round(2) }} seconds</p>
+    <p><strong>Trimmed duration:</strong> {{ record.trimmed_duration | round(2) }} seconds</p>
+    {% endif %}
+
+    <div class="mb-4">
+      <h2>Choose a Title</h2>
+      <form method="post" action="/record/{{ record.id }}/title">
+        {% for title in record.titles %}
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="radio" name="selected_title" id="title{{ loop.index }}" value="{{ title }}" {% if record.selected_title == title %}checked{% endif %}>
+          <label class="form-check-label" for="title{{ loop.index }}">{{ title }}</label>
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-success">Save Title</button>
+      </form>
+    </div>
+
+    <div class="mb-4">
+      <h2>Transcript</h2>
+      <pre class="bg-light p-3 border rounded">{{ record.transcript }}</pre>
+    </div>
+
+    <div class="mb-4">
+      <h2>Short Description</h2>
+      <p class="bg-light p-3 border rounded">{{ record.short_description }}</p>
+    </div>
+
+    <div class="mb-4">
+      <h2>Long Description</h2>
+      <p class="bg-light p-3 border rounded">{{ record.long_description }}</p>
+    </div>
+
+    <div class="mb-4">
+      <h2>Entities</h2>
+      <p><strong>People:</strong> {{ record.people|join(', ') }}</p>
+      <p><strong>Locations:</strong> {{ record.locations|join(', ') }}</p>
+    </div>
+
+    <a href="/" class="btn btn-secondary">Back to home</a>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+File: clipmato/templates/result.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clipmato Results</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/">Clipmato</a>
+      <a href="/scheduler" class="btn btn-outline-primary">Scheduler</a>
+    </div>
+  </nav>
+  <div class="container pb-4">
+    <h1 class="mb-4">Processing Results for {{ filename }}</h1>
+
+    <div class="mb-4">
+      <h2>Transcript</h2>
+      <pre class="bg-light p-3 border rounded">{{ transcript }}</pre>
+    </div>
+
+    <div class="mb-4">
+      <h2>Short Description</h2>
+      <p class="bg-light p-3 border rounded">{{ short_description }}</p>
+    </div>
+
+    <div class="mb-4">
+      <h2>Long Description</h2>
+      <p class="bg-light p-3 border rounded">{{ long_description }}</p>
+    </div>
+
+    <div class="mb-4">
+      <h2>Entities</h2>
+      <p><strong>People:</strong> {{ people|join(', ') }}</p>
+      <p><strong>Locations:</strong> {{ locations|join(', ') }}</p>
+    </div>
+
+    <a href="/record/{{ id }}" class="btn btn-primary me-2">View Details</a>
+    <a href="/" class="btn btn-secondary">Upload another file</a>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+File: clipmato/templates/scheduler.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clipmato - Scheduler</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-light bg-white shadow-sm mb-4">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/">Clipmato</a>
+    </div>
+  </nav>
+  <div class="container pb-4">
+    <h1 class="mb-4">Episode Scheduler</h1>
+
+    <h2>Publication Calendar</h2>
+    <table class="table table-bordered text-center mb-4">
+      <thead>
+        <tr><th colspan="7">{{ month_name }} {{ year }}</th></tr>
+        <tr>
+          {% for d in ['Su','Mo','Tu','We','Th','Fr','Sa'] %}
+          <th>{{ d }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for week in calendar %}
+      <tr>
+        {% for day in week %}
+        <td>
+          {% if day %}
+          <div><strong>{{ day }}</strong></div>
+          {% for ev in events if ev.day == day %}
+          <div class="small mt-1">
+            {{ ev.time }}<br>{{ ev.title }}
+          </div>
+          {% endfor %}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="mb-3">
+      <form method="post" action="/scheduler/auto" class="row g-2 align-items-center" \
+            onsubmit="document.getElementById('sched-loading').classList.remove('d-none')">
+        <div class="col-auto">
+          <label for="cadence" class="col-form-label">Cadence:</label>
+        </div>
+        <div class="col-auto">
+          <select name="cadence" id="cadence" class="form-select form-select-sm">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="every_n">Every N days</option>
+          </select>
+        </div>
+        <div class="col-auto d-none" id="n-days-group">
+          <input type="number" name="n_days" id="n-days" class="form-control form-control-sm" placeholder="N days">
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary btn-sm">Auto-Schedule All</button>
+        </div>
+      </form>
+    </div>
+    {% if not records %}
+    <p>No episodes have been processed yet.</p>
+    {% else %}
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Title</th>
+          <th>Publish &amp; Schedule</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for rec in records %}
+        <tr>
+          <td><a href="/record/{{ rec.id }}">{{ rec.filename }}</a></td>
+          <td>{{ rec.selected_title or '-' }}</td>
+          <td>
+            {% if rec.selected_title %}
+            <form method="post" action="/record/{{ rec.id }}/schedule" \
+                  onsubmit="document.getElementById('sched-loading').classList.remove('d-none')">
+              <div class="mb-1">
+                <label class="form-label me-2">Publish to:</label>
+                {% for target in ['YouTube', 'Spotify', 'Apple Podcasts'] %}
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" name="publish_targets" value="{{ target }}"
+                         id="pt-{{ target|lower|replace(' ', '-') }}-{{ rec.id }}"
+                         {% if rec.publish_targets and target in rec.publish_targets %}checked{% endif %}>
+                  <label class="form-check-label" for="pt-{{ target|lower|replace(' ', '-') }}-{{ rec.id }}">{{ target }}</label>
+                </div>
+                {% endfor %}
+              </div>
+              <div class="input-group input-group-sm">
+                <input type="datetime-local" name="schedule_time" class="form-control"
+                       value="{{ rec.schedule_time[:16] if rec.schedule_time }}" required>
+                <button type="submit" class="btn btn-success">Save</button>
+              </div>
+            </form>
+            {% else %}
+            <span class="text-muted">Select title first</span>
+            {% endif %}
+          </td>
+          <td>
+            <form method="post" action="/record/{{ rec.id }}/delete" onsubmit="return confirm('Delete this record and file?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    <a href="/" class="btn btn-secondary">Back to Home</a>
+
+  <!-- Loading overlay shown while auto-scheduling or manual schedule -->
+  <div id="sched-loading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center bg-white bg-opacity-75">
+    <div class="spinner-border text-primary" style="width:4rem; height:4rem;" role="status">
+      <span class="visually-hidden">Scheduling…</span>
+    </div>
+  </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Toggle N-days input when cadence == 'every_n'
+    const cadenceSelect = document.getElementById('cadence');
+    const nDaysGroup = document.getElementById('n-days-group');
+    const nDaysInput = document.getElementById('n-days');
+    function toggleNDays() {
+      if (cadenceSelect.value === 'every_n') {
+        nDaysGroup.classList.remove('d-none');
+        nDaysInput.disabled = false;
+        nDaysInput.required = true;
+      } else {
+        nDaysGroup.classList.add('d-none');
+        nDaysInput.disabled = true;
+        nDaysInput.required = false;
+        nDaysInput.value = '';
+      }
+    }
+    cadenceSelect.addEventListener('change', toggleNDays);
+    // initialize state on page load
+    toggleNDays();
+  </script>
+</body>
+</html>
+
+File: clipmato/utils/__init__.py
+"""Utility modules for file I/O and metadata management."""
+
+File: clipmato/utils/file_io.py
+import shutil
+from fastapi import UploadFile
+from ..config import UPLOAD_DIR
+
+# Directory where uploaded files are stored
+upload_dir = UPLOAD_DIR
+upload_dir.mkdir(parents=True, exist_ok=True)
+
+def save_upload_file(upload_file: UploadFile) -> str:
+    """
+    Save an uploaded FastAPI UploadFile to the uploads directory
+    and return its file path.
+    """
+    dest = upload_dir / upload_file.filename
+    with open(dest, "wb") as buffer:
+        shutil.copyfileobj(upload_file.file, buffer)
+    return str(dest)
+
+File: clipmato/utils/metadata.py
+import json
+from ..config import METADATA_PATH
+
+# File where metadata records are stored
+metadata_path = METADATA_PATH
+
+def read_metadata() -> list[dict]:
+    """
+    Read the metadata.json file and return the list of processed records.
+    """
+    if metadata_path.exists():
+        return json.loads(metadata_path.read_text())
+    return []
+
+def append_metadata(record: dict) -> None:
+    """
+    Append a new record to the metadata.json file.
+    """
+    records = read_metadata()
+    records.append(record)
+    metadata_path.write_text(json.dumps(records, indent=2))
+
+def update_metadata(record_id: str, updates: dict) -> None:
+    """
+    Update an existing record in metadata.json by merging in new fields.
+    """
+    records = read_metadata()
+    for rec in records:
+        if rec.get("id") == record_id:
+            rec.update(updates)
+            break
+    metadata_path.write_text(json.dumps(records, indent=2))
+
+def remove_metadata(record_id: str) -> dict | None:
+    """
+    Remove a record from metadata.json and return the removed record, or None if not found.
+    """
+    records = read_metadata()
+    removed = None
+    new_records = []
+    for rec in records:
+        if rec.get("id") == record_id:
+            removed = rec
+        else:
+            new_records.append(rec)
+    if removed:
+        metadata_path.write_text(json.dumps(new_records, indent=2))
+    return removed
+
+File: clipmato/utils/progress.py
+import json
+from pathlib import Path
+
+from .file_io import upload_dir
+from ..config import STAGE_PROGRESS
+
+
+def get_status_file(record_id: str) -> Path:
+    """Return the path to the status file for a given record ID."""
+    return Path(upload_dir) / f"{record_id}.status.json"
+
+
+def update_progress(record_id: str, stage: str, message: str | None = None) -> None:
+    """Write the current stage, its mapped percentage, and optional message to the status file."""
+    percent = STAGE_PROGRESS.get(stage, 0)
+    status: dict[str, object] = {"stage": stage, "progress": percent}
+    if message:
+        status["message"] = message
+    get_status_file(record_id).write_text(json.dumps(status))
+
+
+def read_progress(record_id: str) -> dict:
+    """Read and return the progress status for a given record ID."""
+    status_file = get_status_file(record_id)
+    if status_file.exists():
+        try:
+            return json.loads(status_file.read_text())
+        except Exception:
+            pass
+    return {"stage": "pending", "progress": 0}
+    
+def enrich_with_progress(records: list[dict]) -> list[dict]:
+    """
+    Merge each record dict with its current progress status (stage & percentage).
+    """
+    enriched = []
+    for rec in records:
+        status = read_progress(rec.get("id", ""))
+        merged = {**rec, **status}
+        enriched.append(merged)
+    return enriched
+
+
+File: clipmato/web.py
+"""
+Main FastAPI application entrypoint: mounts static files and includes routers.
+"""
+import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+from .config import STATIC_DIR
+from .routers import list_routers
+
+app = FastAPI()
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+for router in list_routers():
+    app.include_router(router)
+
+File: requirements.txt
+openai-agents
+fastapi>=0.95.0
+jinja2>=3.0.0
+aiofiles>=23.1.0
+pydub>=0.25.1
+simpleaudio
+
+

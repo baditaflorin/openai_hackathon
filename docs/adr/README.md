@@ -34,3 +34,8 @@ This directory stores Architecture Decision Records (ADRs) for durable technical
 - [ADR 0014: Dark mode and user theme preference](./0014-dark-mode-and-user-theme-preference.md)
 - [ADR 0015: Virtual scrolling and lazy rendering for the episode library](./0015-virtual-scrolling-and-lazy-rendering-for-episode-library.md)
 - [ADR 0016: In-memory metadata cache with file-change detection](./0016-in-memory-metadata-cache-with-file-watch.md)
+- [ADR 0017: API-first versioned public contracts](./0017-api-first-versioned-public-contracts.md)
+- [ADR 0018: Agent run state machine and tooling contracts](./0018-agent-run-state-machine-and-tooling-contracts.md)
+- [ADR 0019: Event-driven API with SSE and webhooks](./0019-event-driven-api-with-sse-and-webhooks.md)
+- [ADR 0020: MCP gateway and tool capability layer](./0020-mcp-gateway-and-tool-capability-layer.md)
+- [ADR 0021: Agent evaluation, policy engine, and release gates](./0021-agent-evaluation-policy-and-release-gates.md)
