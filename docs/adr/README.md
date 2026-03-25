@@ -39,3 +39,8 @@ This directory stores Architecture Decision Records (ADRs) for durable technical
 - [ADR 0019: Event-driven API with SSE and webhooks](./0019-event-driven-api-with-sse-and-webhooks.md)
 - [ADR 0020: MCP gateway and tool capability layer](./0020-mcp-gateway-and-tool-capability-layer.md)
 - [ADR 0021: Agent evaluation, policy engine, and release gates](./0021-agent-evaluation-policy-and-release-gates.md)
+- [ADR 0022: SQLite-first relational persistence and migrations](./0022-sqlite-first-relational-persistence-and-migrations.md)
+- [ADR 0023: Identity and workspace-scoped access control](./0023-identity-and-workspace-scoped-access-control.md)
+- [ADR 0024: Durable background jobs and worker isolation](./0024-durable-background-jobs-and-worker-isolation.md)
+- [ADR 0025: Guided first-run onboarding and preflight checks](./0025-guided-first-run-onboarding-and-preflight-checks.md)
+- [ADR 0026: Observability, audit trail, and user notifications](./0026-observability-audit-trail-and-user-notifications.md)
