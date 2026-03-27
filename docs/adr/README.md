@@ -44,3 +44,8 @@ This directory stores Architecture Decision Records (ADRs) for durable technical
 - [ADR 0024: Durable background jobs and worker isolation](./0024-durable-background-jobs-and-worker-isolation.md)
 - [ADR 0025: Guided first-run onboarding and preflight checks](./0025-guided-first-run-onboarding-and-preflight-checks.md)
 - [ADR 0026: Observability, audit trail, and user notifications](./0026-observability-audit-trail-and-user-notifications.md)
+- [ADR 0027: Resumable uploads and object-backed media storage](./0027-resumable-uploads-and-object-backed-media-storage.md)
+- [ADR 0028: Usage quotas, rate limits, and cost guardrails](./0028-usage-quotas-rate-limits-and-cost-guardrails.md)
+- [ADR 0029: Privacy, retention, and redaction for user content](./0029-privacy-retention-and-redaction-for-user-content.md)
+- [ADR 0030: Backup, export, restore, and disaster recovery](./0030-backup-export-restore-and-disaster-recovery.md)
+- [ADR 0031: Timezone-safe scheduling and locale-aware publishing](./0031-timezone-safe-scheduling-and-locale-aware-publishing.md)
