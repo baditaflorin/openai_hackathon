@@ -17,10 +17,11 @@ from ..dependencies import (
     get_metadata_service,
     get_publishing_service,
     get_progress_service,
+    get_record_query_service,
     get_scheduling_service,
 )
 from ..runtime import get_public_base_url
-from ..utils.presentation import present_record, workflow_metrics
+from ..utils.presentation import workflow_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +50,10 @@ async def scheduler_page(
     progress_svc=Depends(get_progress_service),
     publishing_svc=Depends(get_publishing_service),
     agent_run_storage=Depends(get_agent_run_storage),
+    record_queries=Depends(get_record_query_service),
 ):
     """Show the scheduling page for manual or automatic scheduling."""
-    records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
-    records.sort(key=lambda rec: rec.get("schedule_time") or rec.get("upload_time", ""))
+    records = record_queries.list_schedule_records(metadata_svc, progress_svc)
     youtube_status = publishing_svc.get_provider_status(
         "youtube",
         redirect_uri=_youtube_callback_url(request),

@@ -33,13 +33,13 @@ from ..dependencies import (
     get_metadata_service,
     get_progress_service,
     get_publishing_service,
+    get_record_query_service,
     runtime_settings_service,
 )
 from ..prompts import read_prompt_runs
 from ..runtime import get_runtime_status
 from ..services.mcp_gateway import DRY_RUN_MODE, LIVE_APPLY_MODE, MCPGatewayService, ToolDefinition, ToolInvocation
 from ..services.runtime_settings import RuntimeSettingsService
-from ..utils.presentation import present_record
 
 router = APIRouter(prefix="/api/v1/mcp", tags=["MCP Gateway"])
 
@@ -124,8 +124,7 @@ def _preview_runtime_profile(profile: str) -> dict[str, Any]:
 
 
 def _records_summary(limit: int | None = None) -> dict[str, Any]:
-    records = [present_record(record) for record in get_progress_service().enrich(get_metadata_service().read())]
-    records.sort(key=lambda record: record.get("upload_time", ""), reverse=True)
+    records = get_record_query_service().list_recent_records(get_metadata_service(), get_progress_service())
     visible = records[:limit] if limit is not None else records
     return {"count": len(records), "records": visible}
 

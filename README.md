@@ -10,6 +10,27 @@ Current release: `0.5.0`
 - **Audio Editor Agent** – Placeholder for audio processing logic.
 - **Distributor Agent** – Publishes episodes.
 
+## Repository Map
+- `clipmato/routers` contains HTTP adapters for HTML pages and `/api/v1` JSON endpoints.
+- `clipmato/dependencies.py` centralizes route-facing facades and shared dependency wiring.
+- `clipmato/services` contains reusable application logic such as file processing, publishing, runtime settings, MCP, and shared record queries.
+- `clipmato/steps` contains task-shaped processing and generation functions used by the pipeline.
+- `clipmato/prompts` contains versioned prompt definitions, prompt execution, contracts, and run history.
+- `clipmato/governance` contains policy checks, prompt release rollout, and evaluation helpers.
+- `clipmato/agent_runs` contains the generic run state machine and tool execution layer.
+- `clipmato/providers` contains external provider integrations such as YouTube publishing.
+- `clipmato/utils` contains focused helpers for metadata, progress, presentation, file IO, and project context.
+- `clipmato/templates` and `clipmato/static` contain the server-rendered UI.
+- `tests` is organized by feature slice and contract surface.
+
+## Navigation Guide
+- Start at `clipmato/web.py` to see app startup, lifespan hooks, and router registration.
+- Read `clipmato/routers/*` to understand how each UI or API surface enters the system.
+- Follow calls through `clipmato/dependencies.py` into `clipmato/services/*` for reusable behavior.
+- For upload processing, `clipmato/services/file_processing.py` and `clipmato/orchestrator.py` are the main workflow path.
+- For prompt-driven tasks, read `clipmato/prompts/registry.py`, `clipmato/prompts/engine.py`, and then the task-specific modules in `clipmato/steps`.
+- For durable traces and agent-style workflows, read `clipmato/agent_runs/*`, `clipmato/services/eventing.py`, and `clipmato/services/publishing.py`.
+
 ## Usage
 ### Authentication
 
@@ -97,6 +118,11 @@ schedules = asyncio.run(propose_schedule_async(records))
 Clipmato supports a plugin mechanism for both agents and pipeline steps.
 Simply drop a new Python module into the `clipmato/agents` or `clipmato/steps`
 directory, and Clipmato will automatically discover and load your plugin.
+
+Discovery conventions:
+- Routers in `clipmato/routers` are discovered when the module exposes `router`.
+- Agents in `clipmato/agents` are discovered when the module exposes variables ending in `_agent`.
+- Steps in `clipmato/steps` are exported when they are public callables defined in the module itself.
 
 #### Agents
 

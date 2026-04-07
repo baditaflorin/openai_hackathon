@@ -21,6 +21,7 @@ from .services.eventing import eventing_service
 from .services.file_processing import process_file_async
 from .services.publishing import PublishingService
 from .services.project_presets import ProjectPresetService
+from .services.record_queries import RecordQueryService
 from .services.runtime_settings import RuntimeSettingsService
 from .services.scheduling import propose_schedule_async
 from .utils.static_assets import static_asset_path
@@ -30,6 +31,7 @@ publishing_service = PublishingService()
 runtime_settings_service = RuntimeSettingsService()
 project_preset_service = ProjectPresetService()
 agent_run_storage = AgentRunStorage()
+record_query_service = RecordQueryService()
 
 
 class FileIOService:
@@ -187,6 +189,11 @@ class PromptGovernanceFacade:
 
     def rollback_prompt_release(self, task: str, actor: str, *, notes: str | None = None):
         return rollback_prompt_release(task, actor, notes=notes)
+
+
+def get_record_query_service() -> RecordQueryService:
+    """Dependency: shared record query helper service."""
+    return record_query_service
 
 
 def get_templates() -> Jinja2Templates:

@@ -12,11 +12,12 @@ from ..dependencies import (
     get_prompt_governance_service,
     get_progress_service,
     get_publishing_service,
+    get_record_query_service,
     get_runtime_settings_service,
     get_templates,
 )
 from ..runtime import get_public_base_url, get_runtime_status
-from ..utils.presentation import present_record, workflow_metrics
+from ..utils.presentation import workflow_metrics
 
 router = APIRouter(include_in_schema=False)
 
@@ -53,10 +54,10 @@ async def settings_page(
     progress_svc=Depends(get_progress_service),
     settings_svc=Depends(get_runtime_settings_service),
     publishing_svc=Depends(get_publishing_service),
+    record_queries=Depends(get_record_query_service),
 ):
     """Render the runtime settings and credential management page."""
-    records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
-    records.sort(key=lambda rec: rec.get("upload_time", ""), reverse=True)
+    records = record_queries.list_recent_records(metadata_svc, progress_svc)
     youtube_status = publishing_svc.get_provider_status(
         "youtube",
         redirect_uri=_public_callback_url(request),

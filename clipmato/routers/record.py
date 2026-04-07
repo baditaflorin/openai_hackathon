@@ -12,9 +12,10 @@ from ..dependencies import (
     get_metadata_service,
     get_file_io_service,
     get_progress_service,
+    get_record_query_service,
 )
 from ..services.eventing import emit_event
-from ..utils.presentation import present_record, workflow_metrics
+from ..utils.presentation import workflow_metrics
 
 router = APIRouter(include_in_schema=False)
 
@@ -26,10 +27,11 @@ async def record_detail(
     templates=Depends(get_templates),
     metadata_svc=Depends(get_metadata_service),
     progress_svc=Depends(get_progress_service),
+    record_queries=Depends(get_record_query_service),
 ):
     """Show detailed view for a processed record."""
-    records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
-    record = next((it for it in records if it.get("id") == record_id), None)
+    records = record_queries.list_recent_records(metadata_svc, progress_svc)
+    record = record_queries.find_record(records, record_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return templates.TemplateResponse(
@@ -50,28 +52,13 @@ async def record_summary(
     record_id: str,
     metadata_svc=Depends(get_metadata_service),
     progress_svc=Depends(get_progress_service),
+    record_queries=Depends(get_record_query_service),
 ) -> JSONResponse:
     """Return a compact record payload for progressive frontend updates."""
-    records = [present_record(rec) for rec in progress_svc.enrich(metadata_svc.read())]
-    record = next((it for it in records if it.get("id") == record_id), None)
+    record = record_queries.get_record(metadata_svc, progress_svc, record_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found")
-    return JSONResponse(
-        {
-            "id": record["id"],
-            "filename": record.get("filename"),
-            "display_title": record.get("display_title"),
-            "display_title_helper": record.get("display_title_helper"),
-            "upload_time": record.get("upload_time"),
-            "progress": record.get("progress", 100),
-            "stage": record.get("stage", "complete"),
-            "message": record.get("message"),
-            "error": record.get("error"),
-            "schedule_time": record.get("schedule_time"),
-            "youtube_job": record.get("youtube_job"),
-            "detail_url": f"/record/{record_id}",
-        }
-    )
+    return JSONResponse(record_queries.build_summary_payload(record, detail_url_base="/record"))
 
 
 @router.post("/record/{record_id}/title", response_class=HTMLResponse)

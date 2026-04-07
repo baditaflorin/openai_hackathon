@@ -35,10 +35,10 @@ from ..dependencies import (
     get_progress_service,
     get_project_preset_service,
     get_publishing_service,
+    get_record_query_service,
 )
 from ..runtime import get_runtime_status
 from ..utils import file_io as file_io_utils
-from ..utils.presentation import present_record
 
 router = APIRouter(prefix="/api/v1", tags=["Public API"])
 
@@ -92,58 +92,6 @@ def _store_idempotent_response(
     )
 
 
-def _public_records(metadata_svc, progress_svc) -> list[dict[str, Any]]:
-    records = [present_record(record) for record in progress_svc.enrich(metadata_svc.read())]
-    records.sort(key=lambda record: record.get("upload_time", ""), reverse=True)
-    return records
-
-
-def _summary_payload(record: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": record["id"],
-        "filename": record.get("filename"),
-        "display_title": record.get("display_title") or record.get("filename") or "Untitled episode",
-        "display_title_helper": record.get("display_title_helper"),
-        "display_subtitle_helper": record.get("display_subtitle_helper"),
-        "upload_time": record.get("upload_time"),
-        "progress": float(record.get("progress", 0)),
-        "stage": str(record.get("stage", "pending")),
-        "message": record.get("message"),
-        "error": record.get("error"),
-        "schedule_time": record.get("schedule_time"),
-        "youtube_job": record.get("youtube_job"),
-        "detail_url": f"/api/v1/record/{record['id']}",
-    }
-
-
-def _detail_payload(record: dict[str, Any]) -> dict[str, Any]:
-    payload = _summary_payload(record)
-    payload.update(
-        {
-            "selected_title": record.get("selected_title"),
-            "titles": list(record.get("titles") or []),
-            "short_description": record.get("short_description"),
-            "long_description": record.get("long_description"),
-            "people": list(record.get("people") or []),
-            "locations": list(record.get("locations") or []),
-            "script": record.get("script"),
-            "distribution": record.get("distribution"),
-            "project_context": record.get("project_context"),
-            "publish_targets": list(record.get("publish_targets") or []),
-            "publish_jobs": dict(record.get("publish_jobs") or {}),
-            "prompt_runs": dict(record.get("prompt_runs") or {}),
-        }
-    )
-    return payload
-
-
-def _find_record(records: list[dict[str, Any]], record_id: str) -> dict[str, Any]:
-    record = next((item for item in records if item.get("id") == record_id), None)
-    if record is None:
-        raise ApiError(status_code=404, code="record_not_found", message="Record not found")
-    return record
-
-
 @router.get("/runtime/status", response_model=RuntimeStatusModel, responses=error_responses())
 async def runtime_status() -> dict[str, Any]:
     """Return the resolved runtime configuration and blockers."""
@@ -160,10 +108,11 @@ async def list_project_presets(project_preset_svc=Depends(get_project_preset_ser
 async def list_records(
     metadata_svc=Depends(get_metadata_service),
     progress_svc=Depends(get_progress_service),
+    record_queries=Depends(get_record_query_service),
 ) -> dict[str, Any]:
     """List records using the versioned public summary contract."""
-    records = _public_records(metadata_svc, progress_svc)
-    return {"records": [_summary_payload(record) for record in records]}
+    records = record_queries.list_recent_records(metadata_svc, progress_svc)
+    return {"records": [record_queries.build_summary_payload(record, detail_url_base="/api/v1/record") for record in records]}
 
 
 @router.get("/record/{record_id}", response_model=RecordDetailModel, responses=error_responses())
@@ -171,10 +120,13 @@ async def get_record(
     record_id: str,
     metadata_svc=Depends(get_metadata_service),
     progress_svc=Depends(get_progress_service),
+    record_queries=Depends(get_record_query_service),
 ) -> dict[str, Any]:
     """Return one record using the versioned public detail contract."""
-    record = _find_record(_public_records(metadata_svc, progress_svc), record_id)
-    return _detail_payload(record)
+    record = record_queries.get_record(metadata_svc, progress_svc, record_id)
+    if record is None:
+        raise ApiError(status_code=404, code="record_not_found", message="Record not found")
+    return record_queries.build_public_detail_payload(record)
 
 
 @router.get("/progress/{record_id}", response_model=ProgressStatusResponse, responses=error_responses())
