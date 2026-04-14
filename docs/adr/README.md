@@ -84,3 +84,8 @@ This directory stores Architecture Decision Records (ADRs) for durable technical
 - [ADR 0064: Snapshot-plus-ledger explainability for workflow history](./0064-snapshot-plus-ledger-explainability-for-workflow-history.md)
 - [ADR 0065: Separate operator HTML routes from versioned machine API](./0065-separate-operator-html-routes-from-versioned-machine-api.md)
 - [ADR 0066: Feature-slice tests and temp-data isolation](./0066-feature-slice-tests-and-temp-data-isolation.md)
+- [ADR 0067: Declarative infrastructure bundles and environment catalog](./0067-declarative-infrastructure-bundles-and-environment-catalog.md)
+- [ADR 0068: CI pipelines and smoke environments as code](./0068-ci-pipelines-and-smoke-environments-as-code.md)
+- [ADR 0069: Runtime composition root and application factory](./0069-runtime-composition-root-and-application-factory.md)
+- [ADR 0070: Shared domain schemas and generated contract artifacts](./0070-shared-domain-schemas-and-generated-contract-artifacts.md)
+- [ADR 0071: Scenario builders, fake adapters, and regression matrices](./0071-scenario-builders-fake-adapters-and-regression-matrices.md)
