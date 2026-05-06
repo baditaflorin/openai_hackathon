@@ -845,6 +845,92 @@ textarea {
   gap: var(--space-3);
 }
 
+.settings-overview {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.settings-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.settings-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.45rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.settings-nav a:hover,
+.settings-nav a:focus {
+  border-color: rgba(23, 93, 89, 0.34);
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.settings-overview__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.settings-overview__item {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  min-height: 7.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(244, 239, 230, 0.66));
+}
+
+.settings-overview__item span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-overview__item strong {
+  color: var(--ink-strong);
+  font-size: 1.22rem;
+  line-height: 1.2;
+}
+
+.settings-overview__item small {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.settings-workspace {
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.8fr);
+  align-items: start;
+}
+
+.settings-operations {
+  align-content: start;
+}
+
+.settings-section-copy {
+  max-width: 64ch;
+  margin-bottom: var(--space-4);
+}
+
+.settings-release-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .settings-runtime-stack {
   display: grid;
   gap: var(--space-4);
@@ -1034,6 +1120,10 @@ textarea {
   .shell-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .settings-overview__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -1048,6 +1138,7 @@ textarea {
 
   .shell-summary,
   .hero-panel__grid,
+  .settings-overview__grid,
   .settings-form-grid,
   .settings-guidance-grid,
   .target-grid,

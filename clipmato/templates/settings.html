@@ -15,11 +15,11 @@
 
 {% block page_eyebrow %}<p class="page-eyebrow">Runtime settings</p>{% endblock %}
 
-{% block page_title %}Choose local or cloud execution without reconfiguring the app on every run{% endblock %}
+{% block page_title %}Settings workspace{% endblock %}
 
 {% block page_intro %}
 <p class="page-intro">
-  Save backend preferences, model targets, service endpoints, and provider credentials under the runtime data directory. Saved values override deployment defaults for this Clipmato install.
+  Configure runtime profiles, provider credentials, publishing access, and prompt rollout controls from one organized view.
 </p>
 {% endblock %}
 
@@ -89,13 +89,53 @@
   </section>
   {% endfor %}
 
-  <section class="workflow-surface workflow-surface--split">
+  <section class="workflow-surface settings-overview" aria-label="Settings overview">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Control center</p>
+        <h2 class="section-title">Start with the area you need</h2>
+      </div>
+      <p class="section-copy">Runtime choices affect processing. Credentials and publishing controls stay separate so secrets are easier to reason about.</p>
+    </div>
+    <nav class="settings-nav" aria-label="Settings sections">
+      <a href="#runtime-settings">Runtime</a>
+      <a href="#credentials-settings">Credentials</a>
+      <a href="#publishing-settings">Publishing</a>
+      <a href="#prompt-settings">Prompt releases</a>
+      <a href="#deployment-settings">Deployment</a>
+    </nav>
+    <div class="settings-overview__grid">
+      <article class="settings-overview__item">
+        <span>Transcription</span>
+        <strong>{{ runtime_status.transcription_backend }}</strong>
+        <small>{{ runtime_status.requested_transcription_backend }}</small>
+      </article>
+      <article class="settings-overview__item">
+        <span>Content</span>
+        <strong>{{ runtime_status.content_backend }}</strong>
+        <small>{{ runtime_status.requested_content_backend }}</small>
+      </article>
+      <article class="settings-overview__item">
+        <span>Local model server</span>
+        <strong>{{ 'reachable' if runtime_status.ollama_reachable else 'unreachable' }}</strong>
+        <small>{{ runtime_status.ollama_model }}</small>
+      </article>
+      <article class="settings-overview__item">
+        <span>YouTube</span>
+        <strong>{{ 'connected' if youtube_status.connected else ('ready' if youtube_status.available else 'blocked') }}</strong>
+        <small>{{ youtube_status.channel_title or youtube_status.message }}</small>
+      </article>
+    </div>
+  </section>
+
+  <section id="runtime-settings" class="workflow-surface workflow-surface--split settings-workspace">
     <form method="post" action="/settings/runtime" class="stack-form" data-busy-form="true">
       <div class="section-heading section-heading--compact">
         <div>
-          <p class="section-kicker">Preferences</p>
-          <h2 class="section-title">Runtime backends and endpoints</h2>
+          <p class="section-kicker">Runtime</p>
+          <h2 class="section-title">Execution profile</h2>
         </div>
+        <p class="section-copy">Pick local, host-native, or cloud defaults first, then tune only the fields that matter.</p>
       </div>
 
       <div class="action-row">
@@ -267,7 +307,14 @@
       </div>
     </form>
 
-    <div class="settings-stack">
+    <div id="credentials-settings" class="settings-stack settings-operations">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-kicker">Operations</p>
+          <h2 class="section-title">Credentials and release controls</h2>
+        </div>
+      </div>
+
       <section class="status-card">
         <div class="section-heading section-heading--compact">
           <div>
@@ -318,7 +365,7 @@
         </form>
       </section>
 
-      <section class="status-card">
+      <section id="publishing-settings" class="status-card">
         <div class="section-heading section-heading--compact">
           <div>
             <p class="section-kicker">Publishing</p>
@@ -346,90 +393,93 @@
         </div>
       </section>
 
-      <section class="status-card">
-        <div class="section-heading section-heading--compact">
-          <div>
-            <p class="section-kicker">Prompt governance</p>
-            <h2 class="section-subtitle">Live apply and canary rollout</h2>
-          </div>
-          <span class="status-pill is-brand">quality-v1</span>
-        </div>
-        <p class="status-card__copy">Release gates use stored prompt-run evaluations. Apply a version live only after it passes the benchmark thresholds, or start with a deterministic canary.</p>
-
-        {% for release in prompt_release_summary %}
-        <article class="status-card">
-          <div class="section-heading section-heading--compact">
-            <div>
-              <h3 class="section-subtitle">{{ release.label }}</h3>
-              <p class="helper-copy">Task: <code>{{ release.task }}</code></p>
-            </div>
-            <span class="status-pill is-muted">live {{ release.live_version }}</span>
-          </div>
-          <p class="helper-copy">
-            Packaged default: <code>{{ release.packaged_default_version }}</code>.
-            {% if release.canary_version %}
-            Canary: <code>{{ release.canary_version }}</code> at {{ release.canary_percentage }}%.
-            {% else %}
-            No canary is active.
-            {% endif %}
-          </p>
-          {% if release.latest_change %}
-          <p class="helper-copy">Latest rollout: {{ release.latest_change.mode }} by {{ release.latest_change.applied_by }} on {{ release.latest_change.applied_at }}.</p>
-          {% endif %}
-
-          <form method="post" action="/settings/prompt-release/{{ release.task }}/apply" class="stack-form" data-busy-form="true">
-            <input type="hidden" name="suite_version" value="quality-v1">
-            <div class="settings-form-grid">
-              <div class="form-cluster">
-                <label class="form-label" for="prompt_version_{{ release.task }}">Prompt version</label>
-                <select class="form-select" id="prompt_version_{{ release.task }}" name="prompt_version">
-                  {% for version in release.versions %}
-                  <option value="{{ version.version }}" {% if version.version == release.live_version %}selected{% endif %}>
-                    {{ version.version }} · {{ version.status }}
-                  </option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="form-cluster">
-                <label class="form-label" for="prompt_actor_{{ release.task }}">Actor</label>
-                <input class="form-control" id="prompt_actor_{{ release.task }}" name="actor" type="text" value="release-bot" autocomplete="off">
-              </div>
-              <div class="form-cluster">
-                <label class="form-label" for="prompt_notes_{{ release.task }}">Notes</label>
-                <input class="form-control" id="prompt_notes_{{ release.task }}" name="notes" type="text" placeholder="Why this rollout is safe to promote." autocomplete="off">
-              </div>
-              <div class="form-cluster">
-                <label class="form-label" for="prompt_canary_{{ release.task }}">Canary percent</label>
-                <input class="form-control" id="prompt_canary_{{ release.task }}" name="canary_percentage" type="number" min="1" max="99" value="{{ release.canary_percentage or 10 }}">
-              </div>
-            </div>
-            <div class="action-row">
-              <button type="submit" class="btn btn-primary" data-busy-label="Applying live release...">Live apply</button>
-              <button formaction="/settings/prompt-release/{{ release.task }}/canary" type="submit" class="btn btn-outline-secondary" data-busy-label="Starting canary...">Start canary</button>
-              <button formaction="/settings/prompt-release/{{ release.task }}/rollback" type="submit" class="btn btn-outline-primary" data-busy-label="Rolling back...">Rollback</button>
-            </div>
-          </form>
-
-          <div class="settings-guidance-grid">
-            {% for version in release.versions %}
-            <article class="status-card">
-              <h4 class="section-subtitle">{{ version.version }}</h4>
-              <p class="helper-copy">Runs: {{ version.quality.run_count }} · Contract pass: {{ version.quality.contract_pass_rate if version.quality.contract_pass_rate is not none else 'n/a' }} · Policy pass: {{ version.quality.policy_pass_rate if version.quality.policy_pass_rate is not none else 'n/a' }}</p>
-              {% if version.gate_passed %}
-              <p class="helper-copy">Release gate: passed</p>
-              {% else %}
-              <p class="helper-copy">Release gate: {{ version.gate_reasons | join(' ') }}</p>
-              {% endif %}
-            </article>
-            {% endfor %}
-          </div>
-        </article>
-        {% endfor %}
-      </section>
     </div>
   </section>
 
-  <section class="workflow-surface">
+  <section id="prompt-settings" class="workflow-surface">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Prompt governance</p>
+        <h2 class="section-title">Live apply and canary rollout</h2>
+      </div>
+      <span class="status-pill is-brand">quality-v1</span>
+    </div>
+    <p class="section-copy settings-section-copy">Release gates use stored prompt-run evaluations. Apply a version live only after it passes the benchmark thresholds, or start with a deterministic canary.</p>
+
+    <div class="settings-release-stack">
+      {% for release in prompt_release_summary %}
+      <article class="status-card">
+        <div class="section-heading section-heading--compact">
+          <div>
+            <h3 class="section-subtitle">{{ release.label }}</h3>
+            <p class="helper-copy">Task: <code>{{ release.task }}</code></p>
+          </div>
+          <span class="status-pill is-muted">live {{ release.live_version }}</span>
+        </div>
+        <p class="helper-copy">
+          Packaged default: <code>{{ release.packaged_default_version }}</code>.
+          {% if release.canary_version %}
+          Canary: <code>{{ release.canary_version }}</code> at {{ release.canary_percentage }}%.
+          {% else %}
+          No canary is active.
+          {% endif %}
+        </p>
+        {% if release.latest_change %}
+        <p class="helper-copy">Latest rollout: {{ release.latest_change.mode }} by {{ release.latest_change.applied_by }} on {{ release.latest_change.applied_at }}.</p>
+        {% endif %}
+
+        <form method="post" action="/settings/prompt-release/{{ release.task }}/apply" class="stack-form" data-busy-form="true">
+          <input type="hidden" name="suite_version" value="quality-v1">
+          <div class="settings-form-grid">
+            <div class="form-cluster">
+              <label class="form-label" for="prompt_version_{{ release.task }}">Prompt version</label>
+              <select class="form-select" id="prompt_version_{{ release.task }}" name="prompt_version">
+                {% for version in release.versions %}
+                <option value="{{ version.version }}" {% if version.version == release.live_version %}selected{% endif %}>
+                  {{ version.version }} · {{ version.status }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-cluster">
+              <label class="form-label" for="prompt_actor_{{ release.task }}">Actor</label>
+              <input class="form-control" id="prompt_actor_{{ release.task }}" name="actor" type="text" value="release-bot" autocomplete="off">
+            </div>
+            <div class="form-cluster">
+              <label class="form-label" for="prompt_notes_{{ release.task }}">Notes</label>
+              <input class="form-control" id="prompt_notes_{{ release.task }}" name="notes" type="text" placeholder="Why this rollout is safe to promote." autocomplete="off">
+            </div>
+            <div class="form-cluster">
+              <label class="form-label" for="prompt_canary_{{ release.task }}">Canary percent</label>
+              <input class="form-control" id="prompt_canary_{{ release.task }}" name="canary_percentage" type="number" min="1" max="99" value="{{ release.canary_percentage or 10 }}">
+            </div>
+          </div>
+          <div class="action-row">
+            <button type="submit" class="btn btn-primary" data-busy-label="Applying live release...">Live apply</button>
+            <button formaction="/settings/prompt-release/{{ release.task }}/canary" type="submit" class="btn btn-outline-secondary" data-busy-label="Starting canary...">Start canary</button>
+            <button formaction="/settings/prompt-release/{{ release.task }}/rollback" type="submit" class="btn btn-outline-primary" data-busy-label="Rolling back...">Rollback</button>
+          </div>
+        </form>
+
+        <div class="settings-guidance-grid">
+          {% for version in release.versions %}
+          <article class="status-card">
+            <h4 class="section-subtitle">{{ version.version }}</h4>
+            <p class="helper-copy">Runs: {{ version.quality.run_count }} · Contract pass: {{ version.quality.contract_pass_rate if version.quality.contract_pass_rate is not none else 'n/a' }} · Policy pass: {{ version.quality.policy_pass_rate if version.quality.policy_pass_rate is not none else 'n/a' }}</p>
+            {% if version.gate_passed %}
+            <p class="helper-copy">Release gate: passed</p>
+            {% else %}
+            <p class="helper-copy">Release gate: {{ version.gate_reasons | join(' ') }}</p>
+            {% endif %}
+          </article>
+          {% endfor %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section id="deployment-settings" class="workflow-surface">
     <div class="section-heading">
       <div>
         <p class="section-kicker">Deployment</p>
